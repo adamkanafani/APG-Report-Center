@@ -103,7 +103,10 @@ function AppLogoMark({ animated }: { animated?: boolean }) {
   return (
     <span className="app-logo-mark">
       <img src="/apg-mark-transparent.png" alt="" className="app-logo-mark-img app-logo-mark-base" />
-      <img src="/apg-mark-transparent.png" alt="" className="app-logo-mark-img app-logo-mark-fill" />
+      {/* The color copy sits in a window that slides down over the mark (see .app-logo-mark-window). */}
+      <span className="app-logo-mark-window">
+        <img src="/apg-mark-transparent.png" alt="" className="app-logo-mark-img app-logo-mark-fill" />
+      </span>
     </span>
   );
 }
@@ -1969,8 +1972,10 @@ export default function Home() {
                       spot however long the title runs ("Repair Recommendations" used to push it
                       into the ✕). */}
                   <div className="section-meta-row">
-                    <span className="confidence-tag">
-                      {s.automationConfidence} confidence
+                    {/* Just the level ("high") -- the full wording is in the tooltip -- so the row
+                        always leaves room for the status badge before the ✕. */}
+                    <span className="confidence-tag" title={`Automation confidence: ${s.automationConfidence}`}>
+                      {s.automationConfidence}
                       {scan.fsAvailable && fsChanges(s) && (
                         <span className="fs-tag" title="Prints differently in the FS (Fleet Service) version">
                           FS

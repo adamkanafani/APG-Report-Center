@@ -283,17 +283,28 @@ footer.app-header::before {
 }
 
 /* Confidence tag on the left, status badge pinned to the right -- one line under the title. */
+/* Kept inside the tab's own width so a long badge ("NEEDS ATTENTION") never runs under the ✕: the
+   badge keeps its size and the confidence tag gives way (shrinks, then trims) if space runs out. */
 .section-meta-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin-top: 5px;
+  min-width: 0;
 }
 
 .section-meta-row .confidence-tag {
   margin-top: 0;
   white-space: nowrap;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.section-meta-row .status-badge {
+  flex: none;
 }
 
 .section-item .title-row span:first-child {
@@ -1317,21 +1328,52 @@ button.photo-filter-tab:hover:not(.active):not(:disabled) {
   filter: grayscale(1) opacity(0.22);
 }
 
-.app-logo-mark-fill {
+/* Smooth fill: instead of re-clipping (and re-shadowing) the image every frame, which stutters,
+   the color copy sits in a window that slides down over the mark while the image inside slides
+   up by the same amount -- both plain transforms, which the browser runs on the GPU. The window
+   is a quarter taller than the mark, its bottom quarter fading out, so the color pours in behind
+   a soft edge rather than a hard line. */
+.app-logo-mark-window {
   position: absolute;
   top: 0;
   left: 0;
-  filter: drop-shadow(0 3px 6px rgba(11, 61, 145, 0.3));
-  clip-path: inset(0 0 100% 0);
-  animation: app-logo-fill 2.2s ease-in-out infinite alternate;
+  width: 100%;
+  height: 125%;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 80%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 80%, transparent 100%);
+  animation: app-logo-window 2.6s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+  will-change: transform;
 }
 
-@keyframes app-logo-fill {
+.app-logo-mark-fill {
+  animation: app-logo-counter 2.6s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+  will-change: transform;
+}
+
+@keyframes app-logo-window {
   from {
-    clip-path: inset(0 0 100% 0);
+    transform: translateY(-100%);
   }
   to {
-    clip-path: inset(0 0 0% 0);
+    transform: translateY(0);
+  }
+}
+
+/* The image's own height is 4/5 of the window's, so 125% of it cancels the window's 100%. */
+@keyframes app-logo-counter {
+  from {
+    transform: translateY(125%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-logo-mark-window,
+  .app-logo-mark-fill {
+    animation-duration: 6s;
   }
 }
 

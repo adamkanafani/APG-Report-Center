@@ -242,8 +242,11 @@ export async function autoDraftJob(scan: JobScanResult, template: ReportTemplate
   if (own && !existingState.sections.cover?.acknowledged) {
     const fields = { ...existingState.sections.cover?.fields };
     let changed = false;
+    const sameWords = (a: string, b: string) => a.replace(/\s+/g, " ").trim() === b.replace(/\s+/g, " ").trim();
     for (const [key, value] of Object.entries(own.coverValues)) {
-      if (!fields[key]?.trim() && value.trim()) {
+      // Empty → the deck's value. The same words with different line breaks (saved before the app
+      // read the author's breaks) → the deck's breaks. Anything the tech rep actually changed stays.
+      if ((!fields[key]?.trim() && value.trim()) || (fields[key] !== value && sameWords(fields[key] ?? "", value))) {
         fields[key] = value;
         changed = true;
       }

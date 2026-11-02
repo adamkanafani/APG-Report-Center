@@ -1,11 +1,12 @@
 import { isHeadingLine, parseInline, stripInline } from "../draft/inlineFormat";
+import { wrapBold } from "../pdf/textMeasure";
 import { promises as fs } from "fs";
 import path from "path";
 import sharp from "sharp";
 import PptxGenJS from "pptxgenjs";
 import type { JobScanResult, SectionScanResult } from "../ingest/scanJobFolder";
 import type { JobState } from "../state/jobState";
-import { coverPages, hasExhibits, REPAIR_LIST_SECTIONS, reportSections, sectionText } from "../pdf/renderReportHtml";
+import { COVER_TEXT_BOTTOM, COVER_VALUE_WIDTH, coverFontSize, coverPages, hasExhibits, REPAIR_LIST_SECTIONS, reportSections, sectionText } from "../pdf/renderReportHtml";
 import { groupPhotos, photoPages, photoPick, photoSlots } from "../pdf/photoGroups";
 import { productKeyFor } from "../draft/priorReport";
 import { toLongPath } from "../util/longPath";
@@ -77,24 +78,48 @@ function addTitle(slide: Slide, title: string, size = 20) {
 
 /** "Label:<tab>Value" rows on one 3-inch tab stop -- how his cover pages line values up (he does it
  * with runs of default 1" tabs; one explicit stop gives the same column and stays put when edited). */
-function fieldRuns(fields: Array<{ label: string; value: string }>, size: number, spaceAfter: number): TextRun[] {
-  // His labels print gray, values black.
-  return fields.flatMap(({ label, value }, i) => [
-    { text: `${label}\t`, options: { bold: true, fontSize: size, fontFace: FONT, color: "7F7F7F", tabStops: [{ position: 3.0 }], paraSpaceAfter: spaceAfter } },
-    { text: value || " ", options: { bold: true, fontSize: size, fontFace: FONT, color: "000000", breakLine: i < fields.length - 1 } },
-  ]);
+// A value's second and later lines ("EQ#: 10956713" under the PO, "Compressor Diaphragm") are their
+// own paragraphs starting with a tab, so they line up under the value instead of wrapping back to
+// the left edge; the one-line gap between rows comes after a row's last line.
+function fieldRuns(fields: Array<{ label: string; value: string }>, size: number): TextRun[] {
+  // One blank line after each row, as on his covers (1.2x the size). PowerPoint rounds paragraph
+  // spacing to whole points, so each row gets the whole-point gap that keeps the running total on
+  // the exact line (25, 24, 25, ... at 20.5pt) -- otherwise rows drift ~0.4pt apiece down the page.
+  const line = size * 1.2;
+  const gapAfter = (row: number) => Math.round((row + 1) * line) - Math.round(row * line);
+  const font = { bold: true, fontSize: size, fontFace: FONT };
+  const tabStops = [{ position: 3.0 }];
+  // PowerPoint would wrap a long value back to the left edge (a text box can't hang its wrapped
+  // lines on the tab stop), so long lines are broken here, between words, measured to fit the value
+  // column -- the same measurement the PDF cover sizes its text by (textMeasure.ts).
+  const wrap = (line: string) => wrapBold(line, size, COVER_VALUE_WIDTH);
+  return fields.flatMap(({ label, value }, i) => {
+    const lines = (value || " ").split("\n").flatMap(wrap);
+    const lastRow = i === fields.length - 1;
+    const runs: TextRun[] = [
+      // His labels print gray, values black.
+      { text: `${label}\t`, options: { ...font, color: "7F7F7F", tabStops, paraSpaceAfter: lines.length > 1 ? 0 : gapAfter(i) } },
+      { text: lines[0], options: { ...font, color: "000000", breakLine: lines.length > 1 || !lastRow } },
+    ];
+    lines.slice(1).forEach((line, k) => {
+      const last = k === lines.length - 2;
+      runs.push({ text: `\t${line}`, options: { ...font, color: "000000", tabStops, paraSpaceAfter: last ? gapAfter(i) : 0, breakLine: !(last && lastRow) } });
+    });
+    return runs;
+  });
 }
 
+/** Both cover slides at his deck's positions (Job 20992): the rows box 3.44in down under the title,
+ * the details rows right under the header; text sized like the PDF cover (coverFontSize), so the
+ * two always come out alike. */
 function addCover(pptx: Pptx, reportTitle: string, page1: Array<{ label: string; value: string }>, page2: Array<{ label: string; value: string }>) {
   const cover = pptx.addSlide({ masterName: "APG_COVER" });
-  cover.addText(reportTitle, { x: 0, y: 3.15, w: W, h: 0.5, fontFace: FONT, fontSize: 24, bold: true, align: "center" });
-  const size1 = page1.length > 9 ? 20 : 24;
-  cover.addText(fieldRuns(page1, size1, page1.length > 8 ? 6 : 12), { x: 0.04, y: 4.1, w: W - 0.08, h: 5.7, valign: "top", color: "000000" });
+  cover.addText(reportTitle, { x: 0, y: 2.53, w: W, h: 0.91, fontFace: FONT, fontSize: 24, bold: true, align: "center", valign: "top", color: "000000" });
+  cover.addText(fieldRuns(page1, coverFontSize(page1, COVER_TEXT_BOTTOM - 249)), { x: 0, y: 3.39, w: W, h: H - 3.39, valign: "top", color: "000000" });
   if (page2.length === 0) return;
   const details = pptx.addSlide({ masterName: "APG_CONTENT" });
   addTitle(details, reportTitle);
-  const size2 = page2.length > 13 ? 18 : page2.length > 11 ? 20 : 24;
-  details.addText(fieldRuns(page2, size2, page2.length > 11 ? 8 : 14), { x: 0, y: 0.79, w: W, h: 8.95, valign: "top", color: "000000" });
+  details.addText(fieldRuns(page2, coverFontSize(page2, COVER_TEXT_BOTTOM - 57.5)), { x: 0, y: 0.75, w: W, h: H - 0.75, valign: "top", color: "000000" });
 }
 
 /** This app's narrative markup (see renderNarrative) as PowerPoint paragraphs. */

@@ -36,6 +36,15 @@ Re-measure against a new author's report before changing any of them.
 - **Layout:** page header (title = report name, 20 pt), then the rows from y 57.5. Same columns and colors as page 1.
 - **Text size:** shrinks from 24 pt in 0.5 pt steps until every row fits above **y 697.5**. 20992, with 10 serial numbers, lands on 20.5 pt, the same as Adan's.
 
+## PowerPoint cover (`buildDeck.ts`)
+
+Same positions and sizes as the PDF cover. Checked by exporting the 20992 deck through PowerPoint: page 1 within 0.8 pt and the details page within 1.3 pt of Adan's.
+
+- **Boxes:** the rows box starts 3.39 in down (page 1) or 0.75 in down (details page), full slide width, with the default 0.1 in inset. That puts labels at 7.2 pt and the tab stop at 3.0 in, so values sit at 223.2 pt.
+- **Line breaks:** a value's extra lines are separate paragraphs that start with a tab, so they stay in the value column. A PowerPoint text box can't hang wrapped lines on a tab stop. Long values are broken by measured Arial Bold widths (`textMeasure.ts`), the same measurement the PDF uses for its text size.
+- **Row spacing:** PowerPoint rounds paragraph spacing to whole points. Each row's gap is the whole-point value that keeps the running total exact (e.g. 25, 24, 25… at 20.5 pt), so rows don't drift down the page.
+- **Blank rows:** blank standard rows stay for filling in, unless the author's own cover has no such row (Adan has no "Part Numbers").
+
 ## Engineering summary / repair lists
 
 | Item | Value |

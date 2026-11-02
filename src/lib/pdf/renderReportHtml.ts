@@ -1,4 +1,5 @@
 import { inlineHtml, isHeadingLine, stripInline } from "../draft/inlineFormat";
+import { wrapBold } from "./textMeasure";
 import { promises as fs } from "fs";
 import path from "path";
 import sharp from "sharp";
@@ -408,12 +409,13 @@ function coverDate(raw: string): string {
  * 20992 details page, with ten serial numbers, came out at 20.5pt the same way. Value column is
  * 316.8pt wide (223.2pt in from the left of a 540pt page); bold Arial averages ~0.58em per char. */
 // Where his cover text box ends on the 720pt page -- his 20992 details page fills it exactly at 20.5pt.
-const COVER_TEXT_BOTTOM = 697.5;
+export const COVER_TEXT_BOTTOM = 697.5;
+/** The cover's value column width: from 223.2pt to the page's right text edge (540 - 7.2pt). */
+export const COVER_VALUE_WIDTH = 309.6;
 
-function coverFontSize(fields: Array<{ label: string; value: string }>, available: number): number {
+export function coverFontSize(fields: Array<{ label: string; value: string }>, available: number): number {
   for (let size = 24; size > 14; size -= 0.5) {
-    const perLine = Math.max(8, Math.floor(316.8 / (size * 0.58)));
-    const lines = fields.reduce((n, f) => n + f.value.split("\n").reduce((m, l) => m + Math.max(1, Math.ceil(l.length / perLine)), 0), 0);
+    const lines = fields.reduce((n, f) => n + f.value.split("\n").reduce((m, l) => m + wrapBold(l, size, COVER_VALUE_WIDTH).length, 0), 0);
     if ((lines + fields.length - 1) * size * 1.2 <= available) return size;
   }
   return 14;
@@ -458,7 +460,15 @@ export function coverPages(
     .filter((f): f is { key: string; label: string; value: string; standard: boolean } => Boolean(f))
     // A blank field prints as a label with nothing after it -- drop it (the PowerPoint keeps blank
     // standard rows, for filling in there; the asset # only when there is one).
-    .filter(({ key, label, value, standard }) => label.trim() !== "" && (value.trim() !== "" || (options?.keepBlankStandard && standard && key !== "assetNumber")));
+    // A blank standard row stays on the PowerPoint for filling in -- unless the author's own cover has
+    // no such row (their labels are known, fieldLabelsExact, and this one isn't among them: Adan's
+    // covers have no "Part Numbers"). The asset # only when there is one.
+    .filter(({ key, label, value, standard }) => {
+      if (label.trim() === "") return false;
+      if (value.trim() !== "") return true;
+      const authorUses = !coverState?.fieldLabelsExact || key in coverState.fieldLabelsExact;
+      return Boolean(options?.keepBlankStandard && standard && key !== "assetNumber" && authorUses);
+    });
   // The cover always breaks to the component-details page right after Tech Rep (anchored to the
   // field's key, so it holds if Tech Rep is dragged elsewhere); one page when Tech Rep is blank.
   const techRepIndex = ordered.findIndex((f) => f.key === "techRep");

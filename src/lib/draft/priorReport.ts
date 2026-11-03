@@ -21,17 +21,57 @@ export interface ProductKey {
    * never from nozzle or vane reports. */
   /** Any other part Adan and Elmer report on ("compressor diaphragm", Job 20992) is keyed by its own
    * name, so it drafts only from earlier reports of that same part. */
-  kind: "nozzle" | "vane" | "support-ring" | "vane-carrier" | `part:${string}`;
+  kind:
+    | "nozzle"
+    | "vane"
+    | "support-ring"
+    | "vane-carrier"
+    | "blade-ring"
+    | "blade-ring-segment"
+    | "compressor-blade-ring"
+    | "iso"
+    | "air-seal"
+    | `part:${string}`;
+}
+
+/** The rest of the parts Elmer Gomez and Adan Aguirre report on (T: survey, jobs 20000-20999), by
+ * how their job folders name them. First match wins, so "ROW 3 BLADE RING (VANE SWAP)" is a blade
+ * ring, not vanes, and "ROW 4 BLADE RING SEGMENTS" (W501D5A) isn't a whole blade ring. Scope words
+ * (DISASSEMBLY, ASSEMBLY, VANE SWAP, "ISOS FROM 20479") don't matter -- the same part, the same
+ * report. */
+const NAMED_PARTS: Array<[RegExp, ProductKey["kind"]]> = [
+  [/support\s*ring/i, "support-ring"],
+  [/va[nv]e\s*carrier/i, "vane-carrier"],
+  [/compressor\s+blade\s+rings?/i, "compressor-blade-ring"],
+  [/blade\s+ring\s+segments?/i, "blade-ring-segment"],
+  [/blade\s+rings?/i, "blade-ring"],
+  [/\bisos?\b|\biso'?s\b|isolation\s+seg/i, "iso"],
+  // Air seal = inner stage seal housing ("ISSH") -- the same component, per Elmer Gomez.
+  [/seal\s+housing|\bissh\b|air\s+seals?\b/i, "air-seal"],
+];
+
+/** "ROW 11COMPRESSOR DIAPHRAGM" (Job 20989) → "ROW 11 COMPRESSOR DIAPHRAGM": a number run into the
+ * next word. Two-letter endings stay ("1ST", "CM2"). */
+const spaced = (s: string) => s.replace(/(\d)([A-Za-z]{3,})/g, "$1 $2");
+
+/** Row / stage / number: "1ST STAGE", "ROW 7", "NUM. 1", "NUMB. 2", "#3". Null for a job covering
+ * several ("#1-3 COMPRESSOR BLADE RINGS") or none. */
+function stageOf(text: string): number | null {
+  if (/#\s*\d+\s*-\s*\d+/.test(text)) return null;
+  const m = text.match(/\b(?:row|stage|num(?:b(?:er)?)?\.?|no\.)\s*(\d{1,2})\b|#\s*(\d{1,2})\b|\b(\d{1,2})(?:st|nd|rd|th)\b|\b(first|second|third|fourth|fifth)\b/i);
+  if (!m) return null;
+  const words = ["first", "second", "third", "fourth", "fifth"];
+  return Number(m[1] ?? m[2] ?? m[3]) || words.indexOf((m[4] ?? "").toLowerCase()) + 1 || null;
 }
 
 /** "CM2 ROW 1 COMPRESSOR DIAPHRAGM" → "compressor diaphragm": the part's words once the model,
  * row / stage and code tokens ("CM2", "R1") are dropped. */
 function otherPartName(text: string): string {
-  return text
+  return spaced(text)
     .toLowerCase()
-    .replace(/\b(row|stage|r)\s*\d\b|\b\d+(st|nd|rd|th)\b|\(qty\s*\d+\)|\beq\s*#?\s*\d+/g, " ")
-    .split(/\s+/)
-    .filter((w) => w && !/\d/.test(w) && !/^(first|second|third|fourth|fifth|set|of|qty)$/.test(w))
+    .replace(/\b(row|stage|r|num(?:b)?\.?|no\.)\s*\d+\b|#\s*\d+|\b\d+(st|nd|rd|th)\b|\(qty\s*\d+\)|\beq\s*#?\s*\d+/g, " ")
+    .split(/[\s()&/-]+/)
+    .filter((w) => w && !/\d/.test(w) && !/^(first|second|third|fourth|fifth|set|of|qty|from|removed|disassembly|assembly|installation|new|i|a|tbd)$/.test(w))
     .map((w) => w.replace(/s$/, ""))
     .join(" ");
 }
@@ -44,37 +84,40 @@ function normalizeFamily(model: string): string {
   if (ge) return `F${ge[1]}`;
   if (/^D5A?$/.test(m)) return "501D5";
   const w = m.match(/^(MHI)?W?(501[A-Z]+\d?)/);
-  if (w) return `${w[1] ?? ""}${w[2].replace(/A$/, "")}`;
+  // "501FF" (Job 20715) is a typo for 501F.
+  if (w) return `${w[1] ?? ""}${w[2].replace(/A$/, "").replace(/([A-Z])\1$/, "$1")}`;
   return m;
 }
 
 export function productKeyFor(metadata: Pick<JobMetadata, "turbineModel" | "part" | "component">): ProductKey | null {
-  const text = `${metadata.part} ${metadata.component}`;
-  if (!metadata.turbineModel || /pilot|fuel|parts?\s*sale/i.test(text)) return null;
+  const text = spaced(`${metadata.part} ${metadata.component}`);
+  if (/pilot|fuel|parts?\s*sale/i.test(text)) return null;
   // Order matters: "1ST STAGE NOZZLE INNER SUPPORT RING" is a support ring, not a nozzle; "VANE
   // CARRIER" (also misspelled "VAVE CARRIER", Job 18177) is a carrier, not vanes. Other carriers
   // (combustor tile carriers, carrier heat shields, stator carrier rings) aren't V&N report parts.
   const other = otherPartName(metadata.part);
-  const kind: ProductKey["kind"] | null = /support\s*ring/i.test(text)
-    ? "support-ring"
-    : /va[nv]e\s*carrier/i.test(text)
-      ? "vane-carrier"
-      : /carrier/i.test(text)
-        ? null
-        : /vane/i.test(text)
-          ? "vane"
-          : /nozzle/i.test(text)
-            ? "nozzle"
-            : other
-              ? `part:${other}`
-              : null;
+  const named = NAMED_PARTS.find(([pattern]) => pattern.test(text))?.[1];
+  // No turbine model in the folder name: only the named parts can still be told apart ("CALPINE
+  // BT-GT4 ROW 1 ISOS", Job 20307); their family is left blank and matches any model.
+  if (!metadata.turbineModel && !named) return null;
+  const kind: ProductKey["kind"] | null = named
+    ? named
+    : /carrier/i.test(text)
+      ? null
+      : /vane/i.test(text)
+        ? "vane"
+        : /nozzle/i.test(text)
+          ? "nozzle"
+          : other
+            ? `part:${other}`
+            : null;
   if (!kind) return null;
   // A support ring is always the 1st-stage ring -- its stage words don't distinguish anything. A
-  // carrier's row ("ROW 1 VANE CARRIER SEGMENTS") does; a whole carrier has none.
-  if (kind === "support-ring") return { family: normalizeFamily(metadata.turbineModel), stage: null, kind };
-  const m = text.match(/\b(1st|first|row\s*1)\b|\b(2nd|second|row\s*2)\b|\b(3rd|third|row\s*3)\b|\b(4th|fourth|row\s*4)\b|\b(5th|row\s*5)\b/i);
-  const stage = m ? [1, 2, 3, 4, 5].find((_, i) => m[i + 1]) ?? null : null;
-  return { family: normalizeFamily(metadata.turbineModel), stage, kind };
+  // carrier's row ("ROW 1 VANE CARRIER SEGMENTS") does; a whole carrier has none. Every other part's
+  // row / number does ("ROW 7 COMPRESSOR DIAPHRAGM" drafts from row 7, not row 12).
+  const family = metadata.turbineModel ? normalizeFamily(metadata.turbineModel) : "";
+  if (kind === "support-ring") return { family, stage: null, kind };
+  return { family, stage: stageOf(text), kind };
 }
 
 /** Same product, ignoring the MHI marker -- which isn't always in the folder name (Job 19168's
@@ -82,7 +125,9 @@ export function productKeyFor(metadata: Pick<JobMetadata, "turbineModel" | "part
  * MHI-ness is settled per deck in findPriorReport instead. */
 const baseFamily = (family: string) => family.replace(/^MHI/, "");
 function sameProduct(a: ProductKey, b: ProductKey): boolean {
-  return baseFamily(a.family) === baseFamily(b.family) && a.stage === b.stage && a.kind === b.kind;
+  // A blank family (no model in the folder name) matches any model.
+  const familyMatch = !a.family || !b.family || baseFamily(a.family) === baseFamily(b.family);
+  return familyMatch && a.stage === b.stage && a.kind === b.kind;
 }
 
 // Listing every job folder under "Working Jobs" walks a couple hundred bucket folders on a network
@@ -211,6 +256,8 @@ export interface PriorDraft {
   coverLabels: string[];
   /** Divider slide titles in deck order ("Serial Number List", "Flow Test", ...). */
   dividers: string[];
+  /** Photo slide titles ("NDT Photos (Blade Ring)", "Shipping") -- see learnPhotoTitles. */
+  photoTitles: string[];
   /** The two cover slides' values keyed by this app's cover field keys (customer, detailsCustomer,
    * serialNumbers, coating, ...), multi-line values kept as lines. */
   coverValues: Record<string, string>;
@@ -397,6 +444,7 @@ async function readPriorDraftNow(prior: PriorReport): Promise<PriorDraft> {
     coverFields: coverFields(slides),
     coverLabels: coverLabels(slides),
     dividers: dividerTitles(slides),
+    photoTitles: [...new Set(slides.filter((s) => !s.hidden && s.pictures >= 2).map(slideTitle).filter(Boolean))],
     ...(() => {
       const cover = coverValues(slides);
       return { coverValues: cover.values, coverLabelsExact: cover.labels, assetWithPO: cover.assetWithPO };

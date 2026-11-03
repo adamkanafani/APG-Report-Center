@@ -250,7 +250,7 @@ function addDivider(pptx: Pptx, title: string) {
 async function addPhotoSlides(pptx: Pptx, section: SectionScanResult, scan: JobScanResult, state: JobState) {
   const paths = photoPick(section, state.sections[section.id], scan.reportType);
   const slots = photoSlots(state.sections[section.id], scan.reportType);
-  for (const group of groupPhotos(paths, state.sections[section.id]?.photoGroupOverrides)) {
+  for (const group of groupPhotos(paths, state.sections[section.id]?.photoGroupOverrides, state.sections[section.id]?.photoGroupTitles)) {
     // The same pages the photo picker shows: each photo in its slot, empty slots left empty.
     for (const batch of photoPages(group.paths, slots)) {
       const slide = pptx.addSlide({ masterName: "APG_CONTENT" });
@@ -272,20 +272,36 @@ async function addPhotoSlides(pptx: Pptx, section: SectionScanResult, scan: JobS
 export function deckFileName(scan: JobScanResult): string {
   const m = scan.metadata;
   const key = productKeyFor(m);
-  // His file-name codes: "S1N" nozzles, "R3V" vanes, "INSR" inner support rings, "Vane Carrier" /
-  // "R1V Carrier Segments" carriers.
-  const code =
-    key?.kind === "support-ring"
+  // Their file-name codes: "S1N" nozzles, "R3V" vanes, "INSR" inner support rings, "Vane Carrier" /
+  // "R1V Carrier Segments" carriers (Alfredo); "R2BR" blade rings, "R1BR Iso's", "R2 ISSH" air seals /
+  // seal housings, "Row 7 CD" compressor diaphragms (Elmer / Adan). Other parts: their own name.
+  const row = key?.stage ? `R${key.stage}` : "";
+  const otherName = key?.kind.startsWith("part:") ? key.kind.slice(5).replace(/\b([a-z])/g, (c) => c.toUpperCase()) : "";
+  const code = !key
+    ? ""
+    : key.kind === "support-ring"
       ? "INSR"
-      : key?.kind === "vane-carrier"
+      : key.kind === "vane-carrier"
         ? key.stage
           ? `R${key.stage}V Carrier Segments`
           : "Vane Carrier"
-        : key?.stage
-          ? key.kind === "vane"
-            ? `R${key.stage}V`
-            : `S${key.stage}N`
-          : "";
+        : key.kind === "vane"
+          ? (row && `${row}V`)
+          : key.kind === "nozzle"
+            ? (key.stage ? `S${key.stage}N` : "")
+            : key.kind === "blade-ring"
+              ? `${row}BR`
+              : key.kind === "blade-ring-segment"
+                ? `${row}BR Segments`
+                : key.kind === "compressor-blade-ring"
+                  ? (key.stage ? `#${key.stage} Compressor Blade Ring` : "Compressor Blade Rings")
+                  : key.kind === "iso"
+                    ? `${row}BR Iso's`
+                    : key.kind === "air-seal"
+                      ? `${row} ISSH`.trim()
+                      : /diaphragm/.test(otherName.toLowerCase())
+                        ? (key.stage ? `Row ${key.stage} CD` : "CD")
+                        : [key.stage ? `Row ${key.stage}` : "", otherName].filter(Boolean).join(" ");
   const customer = m.customer.replace(/\b([a-z])/gi, (c) => c.toUpperCase());
   const kind = /repair/i.test(scan.reportType) ? "Repair Report" : "IA Report";
   return [m.jobNumber, customer, m.turbineModel, code, kind].filter(Boolean).join(" ").replace(/[\\/:*?"<>|]+/g, "-") + ".pptx";

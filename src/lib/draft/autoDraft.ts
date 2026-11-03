@@ -12,6 +12,7 @@ import {
 } from "./narrative";
 import { findOwnReport, findPriorReport, readPriorDraft, type PriorDraft, type PriorReport } from "./priorReport";
 import { selectBestPhotos } from "./photoSelect";
+import { learnPhotoTitles, photoGroupOf } from "../pdf/photoGroups";
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : "Automatic draft generation failed.";
@@ -100,6 +101,14 @@ async function seedLayout(scan: JobScanResult, template: ReportTemplate, prior: 
       });
       if (extra.length > 0) {
         cover.customFields = [...(cover.customFields ?? []), ...extra.map((label) => ({ id: `seed-${label.replace(/[^A-Za-z0-9]/g, "")}`, label, value: "" }))];
+      }
+      // His photo page titles for this job's photo folders ("NDT Photos (Upstream ISOS)").
+      for (const section of scan.sections.filter((s) => s.generation === "llm-vision-select")) {
+        const labels = section.matchedFiles.map((f) => photoGroupOf(f.relativePath).label);
+        const learned = learnPhotoTitles(labels, prior.photoTitles);
+        if (Object.keys(learned).length > 0) {
+          state.sections[section.id] = { ...state.sections[section.id], photoGroupTitles: { ...learned, ...state.sections[section.id]?.photoGroupTitles } };
+        }
       }
       // His exact cover labels ("Unit#", "Prior Repair:") and where he puts the EQ#.
       if (!cover.fieldLabelsExact) cover.fieldLabelsExact = prior.coverLabelsExact;
@@ -223,18 +232,29 @@ export async function autoDraftJob(scan: JobScanResult, template: ReportTemplate
   // The Repair Report's first source is this job's own I&A deck: same engineering findings, its
   // recommendations restated in the past tense, its corrected cover.
   const own = await ownIaDraftFor(scan, template.reportType);
+  // Parts that only ever get a Repair Report (ISOs, Job 20848 -- no I&A at all): no earlier I&A to
+  // draft from, so the last same-part Repair Report stands in -- its engineering summary, and its
+  // Repair Summary as written (already past tense).
+  const priorRepair = !prior && narrativeIds.length > 0 && /repair/i.test(template.reportType) ? await priorRepairDeckFor(scan) : null;
 
   // Recommendations first: on a job drafted straight from the Repair Report, the Repair Summary
   // is built from the same recommendations text.
   const recsState = { ...existingState, sections: { ...existingState.sections } };
-  if (narrativeIds.includes("engineeringSummary")) jobs.push(asPatch("engineeringSummary", engineeringSummaryDraft(scan, prior, "auto", own), ""));
+  if (narrativeIds.includes("engineeringSummary")) jobs.push(asPatch("engineeringSummary", engineeringSummaryDraft(scan, prior ?? priorRepair, "auto", own), ""));
   if (narrativeIds.includes("repairRecommendations")) {
     const draft = repairRecommendationsDraft(scan, prior, "auto", own);
     jobs.push(asPatch("repairRecommendations", draft, "No earlier report for this product and no repair router were found — draft this section manually."));
     if (draft) recsState.sections.repairRecommendations = { ...recsState.sections.repairRecommendations, content: draft.content };
   }
   if (narrativeIds.includes("repairSummary")) {
-    jobs.push(asPatch("repairSummary", repairSummaryDraft(scan, recsState, prior, "auto", own), "No repair recommendations, earlier report or repair router were found — draft this section manually."));
+    const fromRepairReport = priorRepair?.repairSummary ? { content: priorRepair.repairSummary, seededFrom: seededLabel(priorRepair) } : null;
+    jobs.push(
+      asPatch(
+        "repairSummary",
+        repairSummaryDraft(scan, recsState, prior, "auto", own) ?? fromRepairReport,
+        "No repair recommendations, earlier report or repair router were found — draft this section manually."
+      )
+    );
   }
 
   // Cover from this job's own I&A deck: every value the tech rep put there (customer site, PO,

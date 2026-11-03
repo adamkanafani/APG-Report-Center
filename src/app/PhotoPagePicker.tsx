@@ -41,20 +41,22 @@ export function PhotoPagePicker({
   const [layout, setLayout] = useState<Layout>(() => {
     const slots = photoSlots(section.state, reportType);
     const out: Layout = {};
-    for (const g of groupPhotos(photoPick(section, section.state, reportType), section.state.photoGroupOverrides)) out[g.label] = layoutGroup(g.paths, slots);
+    for (const g of groupPhotos(photoPick(section, section.state, reportType), section.state.photoGroupOverrides, section.state.photoGroupTitles)) out[g.label] = layoutGroup(g.paths, slots);
     return out;
   });
   // Pages a group shows beyond its last photo ("+ Add page"), and where Add / Space puts the next
   // photo in each group -- the start of the page just added, else the first empty slot.
   const [shownPages, setShownPages] = useState<Record<string, number>>({});
   const [cursor, setCursor] = useState<Record<string, number>>({});
-  const groupOf = (p: string) => photoGroupOf(p, overrides);
+  // The author's own titles for the folder groups (see learnPhotoTitles).
+  const titles = section.state.photoGroupTitles;
+  const groupOf = (p: string) => photoGroupOf(p, overrides, titles);
 
   // Left-hand tabs: every group the job's photos fall into, in report order.
   const groups = useMemo(() => {
     const counts = new Map<string, number>();
     for (const p of all) {
-      const label = photoGroupOf(p, overrides).label;
+      const label = photoGroupOf(p, overrides, titles).label;
       counts.set(label, (counts.get(label) ?? 0) + 1);
     }
     return [...counts.entries()].map(([label, count]) => ({ label, count })).sort((a, b) => labelRank(a.label) - labelRank(b.label));
@@ -105,7 +107,7 @@ export function PhotoPagePicker({
   // Into group `label`: the photo's own folder group needs no override.
   const withGroup = (p: string, label: string) => {
     const next = { ...overrides };
-    if (photoGroupOf(p).label === label) delete next[p];
+    if (photoGroupOf(p, undefined, titles).label === label) delete next[p];
     else next[p] = label;
     return next;
   };
@@ -279,7 +281,7 @@ export function PhotoPagePicker({
               className="secondary"
               onClick={() => {
                 const next: Layout = {};
-                for (const g of groupPhotos(iaPick.filter((p) => all.includes(p)), overrides)) next[g.label] = g.paths;
+                for (const g of groupPhotos(iaPick.filter((p) => all.includes(p)), overrides, titles)) next[g.label] = g.paths;
                 save(next);
               }}
             >

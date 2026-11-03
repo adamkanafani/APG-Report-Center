@@ -7,17 +7,23 @@
 /** His wording for the NDT-1 part folders the shop creates ("NOZZLE", "INCOMING RETAINER RING",
  * "CORES AND COVERS", ...). Anything else is title-cased as-is. */
 function partLabel(folder: string): string {
-  const f = folder.replace(/^incoming\s+/i, "").trim();
-  if (/nozzle|segment/i.test(f)) return "Segments";
-  if (/vane/i.test(f)) return "Vanes";
+  const f = folder.replace(/^incoming\s+/i, "").replace(/segements/i, "segments").trim();
+  if (/nozzle/i.test(f) || /^segments?$/i.test(f)) return "Segments";
+  if (/^vanes?$/i.test(f)) return "Vanes";
   if (/retain(er|ing)\s*ring|ret\.?\s*ring/i.test(f)) return "Ret. Ring";
   if (/cores?\s*(&|and)\s*covers?/i.test(f)) return "Cores & Covers";
   if (/flat\s*seal/i.test(f)) return "Flat Seals";
   if (/packing/i.test(f)) return "Packings";
-  return f.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase());
+  if (/diaph/i.test(f)) return "Diaphragm"; // "COMP DIAPH" (Elmer's folders)
+  // Title case, keeping the shop's acronyms as written ("DOWNSTREAM ISOS" → "Downstream ISOS").
+  return f
+    .toLowerCase()
+    .replace(/\b([a-z])/g, (m) => m.toUpperCase())
+    .replace(/\b(Isos?|Iso'S|Issh|Tbc|Id|Od|Le|Te|Ndt)\b/g, (m) => m.toUpperCase().replace("'S", "'s"));
 }
 
-const KNOWN_PART = /nozzle|segment|vane|retain(er|ing)\s*ring|ret\.?\s*ring|cores?|covers?|flat\s*seal|packing|hardware/i;
+/** A folder named after the component's own code ("NDT-1\CM2", Job 20992) rather than a part. */
+const COMPONENT_CODE = /^[a-z]{1,4}\d{1,2}$/i;
 
 export function photoGroup(folderPath: string): { label: string; rank: number } {
   const parts = folderPath.split("/");
@@ -26,14 +32,17 @@ export function photoGroup(folderPath: string): { label: string; rank: number } 
     return i !== -1 ? parts[i + 1] : undefined;
   };
   if (/shipping/i.test(folderPath)) return { label: /3c\s*final/i.test(folderPath) ? "Final Shipping Photos" : "Shipping Photos", rank: 0 };
-  // "NDT Photos (Segments)" / "(Cores & Covers)" when the NDT subfolder names a part; a folder named
-  // after the component itself ("NDT-1\CM2", Job 20992) is just "NDT Photos", as Adan titles it.
+  // "NDT Photos (Segments)" / "(Blade Ring)" / "(Downstream ISOS)" for the part the NDT subfolder
+  // names; a folder named after the component's code ("NDT-1\CM2", Job 20992) is just "NDT Photos",
+  // as Adan titles it.
   const ndtPart = after(/^ndt/i);
-  if (ndtPart && KNOWN_PART.test(ndtPart)) return { label: `NDT Photos (${partLabel(ndtPart)})`, rank: 1 };
+  if (ndtPart && !COMPONENT_CODE.test(ndtPart.trim())) return { label: `NDT Photos (${partLabel(ndtPart)})`, rank: 1 };
   if (/ndt/i.test(folderPath)) return { label: "NDT Photos", rank: 1 };
   if (/hardware/i.test(folderPath)) return { label: "Incoming Photos (Hardware)", rank: 2 };
   // Loose photos straight in "3 Pictures\3A Incoming" (no subfolder).
   if (/3a\s*incoming$/i.test(folderPath)) return { label: "Incoming Photos", rank: 2 };
+  // In-process shots (3B, dated "OUT TO SWI ..." / "IN FROM ..." folders): one group, after incoming.
+  if (/3b\s*in-?\s*process/i.test(folderPath)) return { label: "In-Process Photos", rank: 2 };
   if (/3c\s*final/i.test(folderPath)) {
     const sub = after(/^3c\s*final/i);
     return { label: sub && !/^final$/i.test(sub) ? `Final Photos (${partLabel(sub)})` : "Final Photos", rank: 3 };
@@ -54,19 +63,46 @@ export function labelRank(label: string): number {
 }
 
 /** A photo's group: the one the tech rep moved it to (a shot the shop filed in the wrong folder),
- * else the one its folder says. */
-export function photoGroupOf(relativePath: string, overrides?: Record<string, string>): { label: string; rank: number } {
+ * else the one its folder says -- under the author's own title for it when one was learned from
+ * their last report of the part (`titles`, see learnPhotoTitles). */
+export function photoGroupOf(relativePath: string, overrides?: Record<string, string>, titles?: Record<string, string>): { label: string; rank: number } {
   const moved = overrides?.[relativePath];
   if (moved) return { label: moved, rank: labelRank(moved) };
   const folder = relativePath.includes("/") ? relativePath.slice(0, relativePath.lastIndexOf("/")) : "";
-  return photoGroup(folder);
+  const group = photoGroup(folder);
+  const learned = titles?.[group.label];
+  return learned ? { label: learned, rank: group.rank } : group;
+}
+
+/** The author's photo-slide titles for this job's photo groups, from their last report of the same
+ * part: "NDT Photos (Upstream)" → "NDT Photos (Upstream ISOS)", "Shipping Photos" → "Shipping"
+ * (Elmer Gomez, Job 20975). A title is taken when it's in the same place in the report (shipping /
+ * NDT / incoming / final) and one's words all start the other's words -- otherwise the folder's
+ * own title stays. */
+export function learnPhotoTitles(labels: string[], learned: string[]): Record<string, string> {
+  const words = (s: string) => s.toLowerCase().replace(/[()]/g, " ").split(/\s+/).filter((w) => w && w !== "photos");
+  const covers = (a: string[], b: string[]) => a.every((w) => b.some((v) => v.startsWith(w) || w.startsWith(v)));
+  // Incoming and final stay apart: "Final Shipping Photos" never takes the incoming "Shipping".
+  const isFinal = (s: string) => /final/i.test(s);
+  const out: Record<string, string> = {};
+  for (const label of new Set(labels)) {
+    if (learned.includes(label)) continue;
+    const a = words(label);
+    const match = learned
+      .filter((t) => labelRank(t) === labelRank(label) && isFinal(t) === isFinal(label))
+      .map((t) => ({ t, b: words(t) }))
+      .filter(({ b }) => a.length > 0 && b.length > 0 && (covers(a, b) || covers(b, a)))
+      .sort((x, y) => Math.abs(x.b.length - a.length) - Math.abs(y.b.length - a.length))[0];
+    if (match) out[label] = match.t;
+  }
+  return out;
 }
 
 /** Selected photos (relative paths, in the tech rep's order) grouped into titled runs. */
-export function groupPhotos(paths: string[], overrides?: Record<string, string>): Array<{ label: string; paths: string[] }> {
+export function groupPhotos(paths: string[], overrides?: Record<string, string>, titles?: Record<string, string>): Array<{ label: string; paths: string[] }> {
   const groups = new Map<string, { rank: number; paths: string[] }>();
   for (const relativePath of paths) {
-    const { label, rank } = photoGroupOf(relativePath, overrides);
+    const { label, rank } = photoGroupOf(relativePath, overrides, titles);
     const g = groups.get(label) ?? { rank, paths: [] };
     g.paths.push(relativePath);
     groups.set(label, g);

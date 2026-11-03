@@ -185,7 +185,7 @@ async function renderPhotoPages(section: SectionScanResult, jobRoot: string, sec
   // Six to a page, two across and three down, each page under its group's title -- the same pages
   // the tech rep laid out in the photo picker and the same layout as the PowerPoint photo slides.
   const pages: string[] = [];
-  for (const { label, paths: group } of groupPhotos(paths, sectionState?.photoGroupOverrides)) {
+  for (const { label, paths: group } of groupPhotos(paths, sectionState?.photoGroupOverrides, sectionState?.photoGroupTitles)) {
     for (const page of photoPages(group, photoSlots(sectionState, reportType))) {
       const images = await Promise.all(
         page.map(async (relativePath) => {

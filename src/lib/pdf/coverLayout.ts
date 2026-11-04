@@ -126,7 +126,8 @@ export async function measureCoverLayout(pdfPath: string): Promise<CoverLayout |
     }
     await doc.destroy();
     return layout;
-  } catch {
+  } catch (err) {
+    console.warn("Couldn't measure the cover in", pdfPath, err);
     return null;
   }
 }

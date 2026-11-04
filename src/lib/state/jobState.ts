@@ -52,6 +52,9 @@ export interface SectionState {
   fieldLabelsExact?: Record<string, string>;
   /** For the cover section: print the asset / EQ# under the PO number instead of on its own row. */
   assetWithPO?: boolean;
+  /** For the cover section: where the author's covers put the logo, title and rows, their text sizes
+   * and row spacing -- measured off their last report (see coverLayout.ts). */
+  coverLayout?: import("../pdf/coverLayout").CoverLayout;
   /** True once a human has looked at this section and accepted it, even if status was
    * "needs-attention" or "missing" — lets "Generate Report" proceed deliberately. */
   acknowledged?: boolean;

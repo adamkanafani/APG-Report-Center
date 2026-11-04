@@ -84,8 +84,10 @@ export const INCOMING_NDT_RULES: SourceMatchRule[] = [
   {
     kind: "filenamePattern",
     pattern: /./,
-    // Coating-stage checks ("VISUAL COATING") happen after repair too, despite no FINAL prefix.
-    excludePattern: /final|pre[\s-]?coat|coating|post[\s-]?weld|in[\s-]?process|^copy of/i,
+    // Coating-stage checks ("VISUAL COATING") happen after repair too, despite no FINAL prefix --
+    // and so do visual checks of the repair welds ("VISUAL CORE WELDS", "VISUAL COVER PLATE WELDS",
+    // Job 19797: in-process sequences 47500 / 48500, not in Alfredo's I&A).
+    excludePattern: /final|pre[\s-]?coat|coating|post[\s-]?weld|in[\s-]?process|\bwelds?\b|^copy of/i,
     folder: /7d|(^|\/)[^/]*ndt/i,
     requiredExtensions: [".pdf", ".xlsx", ".xlsm"],
   },

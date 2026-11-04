@@ -238,8 +238,19 @@ async function scanMultiSection(
   // Flow.xlsx" beside "... Air Flow ID.pdf" / "... Air Flow OD.pdf" (20564): the PDFs are what prints.
   const pdfs = candidates.filter((f) => f.ext === ".pdf");
   const pdfForms = new Set(pdfs.map((f) => formNumberOf(f.baseName)).filter(Boolean));
+  // Also the same sheet under a revised or misspelled name: "INCOMING RETAINER RING.xlsx" beside its
+  // print "INCOMING RETANIER RING REV.pdf" (Job 19797) -- "REV" dropped and each word's letters
+  // compared in any order, so a transposed-letter typo still matches.
+  const looseStem = (f: JobFile) =>
+    stem(f)
+      .split(/[\s_-]+/)
+      .filter((w) => w && !/^(rev(ised)?|copy|of)$/.test(w))
+      .map((w) => [...w].sort().join(""))
+      .join(" ");
   const isWorkingCopy = (f: JobFile) =>
-    f.ext !== ".pdf" && ((formNumberOf(f.baseName) !== undefined && pdfForms.has(formNumberOf(f.baseName))) || pdfs.some((p) => stem(p).startsWith(stem(f))));
+    f.ext !== ".pdf" &&
+    ((formNumberOf(f.baseName) !== undefined && pdfForms.has(formNumberOf(f.baseName))) ||
+      pdfs.some((p) => stem(p).startsWith(stem(f)) || looseStem(p) === looseStem(f)));
   const workingCopies = candidates.filter((f) => !manualPaths.has(f.relativePath) && isWorkingCopy(f));
   pool = pool.filter((f) => !workingCopies.includes(f));
   let defaultSelectedPaths = candidates.filter((f) => manualPaths.has(f.relativePath) || pool.includes(f)).map((f) => f.relativePath);

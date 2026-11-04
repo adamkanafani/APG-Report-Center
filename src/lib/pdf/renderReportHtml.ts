@@ -1,5 +1,6 @@
 import { inlineHtml, isHeadingLine, stripInline } from "../draft/inlineFormat";
 import { wrapBold } from "./textMeasure";
+import { DEFAULT_COVER_LAYOUT } from "./coverLayout";
 import { promises as fs } from "fs";
 import path from "path";
 import sharp from "sharp";
@@ -332,6 +333,13 @@ const REPORT_STYLES = (apgBlue: string, apgBarGray: string) => `
      then the rows from just under the bars. */
   .cover-continued { padding-top: 0; text-align: left; }
   .cover-continued .cover-fields { margin-top: 0; }
+  /* Fixed positions from the author's cover (coverLayout.ts): the page is the frame, and the logo,
+     title and rows sit at their measured tops. */
+  .cover-fixed { position: relative; height: 715pt; padding-top: 0; }
+  .cover-fixed > .cover-logo { position: absolute; left: 116pt; margin: 0; }
+  .cover-fixed > h1 { position: absolute; left: 0; right: 0; margin: 0; line-height: 1.15; }
+  .cover-fixed > .cover-fields { position: absolute; left: 0; right: 0; }
+  .cover-fixed .cover-row { margin-bottom: var(--cover-gap, 1.2em); }
 
   table { border-collapse: collapse; width: 100%; margin-top: 8px; }
   th, td { border: 1px solid #ccc; padding: 3px 6px; font-size: 9px; }
@@ -413,12 +421,12 @@ export const COVER_TEXT_BOTTOM = 697.5;
 /** The cover's value column width: from 223.2pt to the page's right text edge (540 - 7.2pt). */
 export const COVER_VALUE_WIDTH = 309.6;
 
-export function coverFontSize(fields: Array<{ label: string; value: string }>, available: number): number {
-  for (let size = 24; size > 14; size -= 0.5) {
+export function coverFontSize(fields: Array<{ label: string; value: string }>, available: number, maxSize = 24, gapLines = 1): number {
+  for (let size = maxSize; size > 12; size -= 0.5) {
     const lines = fields.reduce((n, f) => n + f.value.split("\n").reduce((m, l) => m + wrapBold(l, size, COVER_VALUE_WIDTH).length, 0), 0);
-    if ((lines + fields.length - 1) * size * 1.2 <= available) return size;
+    if ((lines + (fields.length - 1) * gapLines) * size * 1.2 <= available) return size;
   }
-  return 14;
+  return 12;
 }
 
 export function coverPages(
@@ -468,7 +476,10 @@ export function coverPages(
       if (value.trim() !== "") return true;
       const authorUses = !coverState?.fieldLabelsExact || key in coverState.fieldLabelsExact;
       return Boolean(options?.keepBlankStandard && standard && key !== "assetNumber" && authorUses);
-    });
+    })
+    // A row the author's covers never have at all (Alfredo's details page has no "Customer") is left
+    // off even when the job folder supplies a value -- unless the tech rep typed one in themselves.
+    .filter(({ key, standard }) => !standard || !coverState?.fieldLabelsExact || key in coverState.fieldLabelsExact || coverOverrides[key] !== undefined || key === "jobNumber" || key === "date");
   // The cover always breaks to the component-details page right after Tech Rep (anchored to the
   // field's key, so it holds if Tech Rep is dragged elsewhere); one page when Tech Rep is blank.
   const techRepIndex = ordered.findIndex((f) => f.key === "techRep");
@@ -569,19 +580,26 @@ export async function renderReportSegments(scanIn: JobScanResult, state: JobStat
   const { page1, page2 } = coverPages(scan, state);
   const coverRowsHtml = (fields: Array<{ label: string; value: string }>) =>
     fields.map(({ label, value }) => `<div class="cover-row"><span class="cover-label">${escapeHtml(label)}</span><span class="cover-value">${escapeHtml(value)}</span></div>`).join("");
-  // His cover rows start 249pt down on page 1 and 57.5pt down on the details page (right under the
-  // header), in the 720pt-tall page.
+  // Laid out the way this author's own covers are (measured off their last report -- see
+  // coverLayout.ts): logo, title and rows at their positions, their text sizes, their row spacing.
+  const L = state.sections.cover?.coverLayout ?? DEFAULT_COVER_LAYOUT;
+  const size1 = coverFontSize(page1, COVER_TEXT_BOTTOM - L.rows1Top, L.size1, L.gapLines1);
+  // Chrome sets a line's text about 0.15em lower in its box than the measured top (coverLayout.ts
+  // ASCENT), less half the leading -- measured on 19797 and 20992.
+  const rowsAt = (top: number, size: number) => top + 0.125 * size;
+  const rowsStyle = (size: number, gapLines: number) => `font-size: ${size}pt; --cover-gap: ${gapLines * 1.2}em`;
   bodyParts.push(`
-    <section class="cover">
-      <img class="cover-logo" src="${logo}" alt="APG" />
-      <h1>${escapeHtml(scan.reportType)}</h1>
-      <div class="cover-fields" style="font-size: ${coverFontSize(page1, COVER_TEXT_BOTTOM - 249)}pt">${coverRowsHtml(page1)}</div>
+    <section class="cover cover-fixed">
+      <img class="cover-logo" src="${logo}" alt="APG" style="top: ${L.logoTop}pt" />
+      <h1 style="top: ${L.titleTop + 0.15 * L.titleSize}pt; font-size: ${L.titleSize}pt">${escapeHtml(scan.reportType)}</h1>
+      <div class="cover-fields" style="top: ${rowsAt(L.rows1Top, size1)}pt; ${rowsStyle(size1, L.gapLines1)}">${coverRowsHtml(page1)}</div>
     </section>`);
   if (page2.length > 0) {
+    const size2 = coverFontSize(page2, COVER_TEXT_BOTTOM - L.rows2Top, L.size2, L.gapLines2);
     bodyParts.push(`
-      <section class="cover cover-continued report-page">
+      <section class="cover cover-continued cover-fixed report-page">
         ${pageHeader(scan.reportType, logo)}
-        <div class="cover-fields" style="font-size: ${coverFontSize(page2, COVER_TEXT_BOTTOM - 57.5)}pt">${coverRowsHtml(page2)}</div>
+        <div class="cover-fields" style="top: ${rowsAt(L.rows2Top, size2)}pt; ${rowsStyle(size2, L.gapLines2)}">${coverRowsHtml(page2)}</div>
       </section>`);
   }
 

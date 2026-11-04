@@ -1,4 +1,7 @@
 import path from "path";
+import { promises as fs } from "fs";
+import { toLongPath } from "../util/longPath";
+import { measureCoverLayout } from "../pdf/coverLayout";
 import type { JobScanResult } from "../ingest/scanJobFolder";
 import { loadJobState, mutateJobState, updateSectionStates, type JobState, type SectionState } from "../state/jobState";
 import type { ReportTemplate } from "../report-templates/types";
@@ -63,6 +66,38 @@ const KNOWN_COVER_LABELS = new Set(
     "prior job #'s", "prior jobs", "asset#", "asset #", "asset", "eq#", "eq #", "eq",
   ].map((l) => l.replace(/\s+/g, ""))
 );
+
+/** The exported PDF next to a report deck ("... IA Report REV.pptx" → "... IA Report REV.pdf"). */
+async function pdfBeside(deckPath: string): Promise<string | null> {
+  const dir = path.dirname(deckPath);
+  const stem = path.basename(deckPath, path.extname(deckPath)).toLowerCase();
+  const names = await fs.readdir(toLongPath(dir)).catch(() => [] as string[]);
+  const pdf = names.find((n) => n.toLowerCase() === `${stem}.pdf`) ?? names.find((n) => n.toLowerCase().startsWith(stem) && n.toLowerCase().endsWith(".pdf"));
+  return pdf ? path.join(dir, pdf) : null;
+}
+
+/** Fills in what the cover learns from the author -- its layout (coverLayout.ts), exact labels and
+ * EQ# placement -- whenever it hasn't been yet: from this job's own I&A deck on a Repair Report,
+ * else the last same-product report. */
+async function learnCover(scan: JobScanResult, template: ReportTemplate): Promise<void> {
+  const cover = (await loadJobState(scan.jobRoot)).sections.cover;
+  if (cover?.coverLayout && cover.fieldLabelsExact) return;
+  const repair = /repair/i.test(template.reportType);
+  const source = (await ownIaDraftFor(scan, template.reportType)) ?? (repair ? await priorRepairDeckFor(scan) : await priorDraftFor(scan));
+  if (!source) return;
+  const pdf = cover?.coverLayout ? null : await pdfBeside(source.source.file);
+  const layout = pdf ? await measureCoverLayout(pdf) : null;
+  await mutateJobState(scan.jobRoot, (state) => {
+    const c = { ...state.sections.cover };
+    // Labels learned before the layout was (an older read that missed a details page with no
+    // "Customer:" row) are read again along with it.
+    const relearn = !c.fieldLabelsExact || (!c.coverLayout && Boolean(layout));
+    if (relearn && Object.keys(source.coverLabelsExact).length > 0) c.fieldLabelsExact = { ...c.fieldLabelsExact, ...source.coverLabelsExact };
+    if (!c.coverLayout && layout) c.coverLayout = layout;
+    if (c.assetWithPO === undefined) c.assetWithPO = source.assetWithPO;
+    state.sections.cover = c;
+  });
+}
 
 /**
  * Once per job and report type: take the layout conventions of the last same-product report of the
@@ -211,6 +246,10 @@ export async function autoDraftJob(scan: JobScanResult, template: ReportTemplate
     const layoutPrior = /repair/i.test(template.reportType) ? await priorRepairDeckFor(scan) : await priorDraftFor(scan);
     await seedLayout(scan, template, layoutPrior);
   }
+
+  // The cover as the author lays it out: positions and sizes measured off their last report's PDF,
+  // and their exact labels -- for a job set up before the app learned these, too.
+  await learnCover(scan, template);
 
   const bySectionId = new Map(scan.sections.map((s) => [s.id, s]));
   const existingState = await loadJobState(jobRoot);

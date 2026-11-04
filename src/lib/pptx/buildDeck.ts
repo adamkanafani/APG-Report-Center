@@ -1,5 +1,6 @@
 import { isHeadingLine, parseInline, stripInline } from "../draft/inlineFormat";
 import { wrapBold } from "../pdf/textMeasure";
+import { DEFAULT_COVER_LAYOUT, type CoverLayout } from "../pdf/coverLayout";
 import { promises as fs } from "fs";
 import path from "path";
 import sharp from "sharp";
@@ -59,7 +60,8 @@ function defineMasters(pptx: Pptx, logo: string) {
   pptx.defineSlideMaster({
     title: "APG_COVER",
     background: { color: "FFFFFF" },
-    objects: [{ image: { x: 1.47, y: 0.14, w: 4.27, h: 2.37, data: logo } }],
+    // The logo goes on each cover slide itself (addCover), at the author's own height.
+    objects: [],
   });
   pptx.defineSlideMaster({
     title: "APG_CONTENT",
@@ -81,12 +83,12 @@ function addTitle(slide: Slide, title: string, size = 20) {
 // A value's second and later lines ("EQ#: 10956713" under the PO, "Compressor Diaphragm") are their
 // own paragraphs starting with a tab, so they line up under the value instead of wrapping back to
 // the left edge; the one-line gap between rows comes after a row's last line.
-function fieldRuns(fields: Array<{ label: string; value: string }>, size: number): TextRun[] {
-  // One blank line after each row, as on his covers (1.2x the size). PowerPoint rounds paragraph
-  // spacing to whole points, so each row gets the whole-point gap that keeps the running total on
-  // the exact line (25, 24, 25, ... at 20.5pt) -- otherwise rows drift ~0.4pt apiece down the page.
-  const line = size * 1.2;
-  const gapAfter = (row: number) => Math.round((row + 1) * line) - Math.round(row * line);
+function fieldRuns(fields: Array<{ label: string; value: string }>, size: number, gapLines = 1): TextRun[] {
+  // The author's blank space after each row (one line on Adan's covers, two on Alfredo's details
+  // page). PowerPoint rounds paragraph spacing to whole points, so each row gets the whole-point gap
+  // that keeps the running total exact (25, 24, 25, ... for a 24.6pt gap) -- otherwise rows drift.
+  const gap = size * 1.2 * gapLines;
+  const gapAfter = (row: number) => Math.round((row + 1) * gap) - Math.round(row * gap);
   const font = { bold: true, fontSize: size, fontFace: FONT };
   const tabStops = [{ position: 3.0 }];
   // PowerPoint would wrap a long value back to the left edge (a text box can't hang its wrapped
@@ -112,14 +114,32 @@ function fieldRuns(fields: Array<{ label: string; value: string }>, size: number
 /** Both cover slides at his deck's positions (Job 20992): the rows box 3.44in down under the title,
  * the details rows right under the header; text sized like the PDF cover (coverFontSize), so the
  * two always come out alike. */
-function addCover(pptx: Pptx, reportTitle: string, page1: Array<{ label: string; value: string }>, page2: Array<{ label: string; value: string }>) {
+/** Both cover slides at the author's own positions and sizes (coverLayout.ts -- the same layout the
+ * PDF cover uses): the logo, the title, the rows box. */
+function addCover(
+  pptx: Pptx,
+  reportTitle: string,
+  page1: Array<{ label: string; value: string }>,
+  page2: Array<{ label: string; value: string }>,
+  L: CoverLayout,
+  logo: string
+) {
+  const pt = (v: number) => v / 72;
+  // Where a box goes so its first line's text top lands at `top` (exported through PowerPoint and
+  // measured on 19797 and 20992).
+  const at = (top: number, size: number) => pt(top - 3.6 + 0.107 * size);
   const cover = pptx.addSlide({ masterName: "APG_COVER" });
-  cover.addText(reportTitle, { x: 0, y: 2.53, w: W, h: 0.91, fontFace: FONT, fontSize: 24, bold: true, align: "center", valign: "top", color: "000000" });
-  cover.addText(fieldRuns(page1, coverFontSize(page1, COVER_TEXT_BOTTOM - 249)), { x: 0, y: 3.39, w: W, h: H - 3.39, valign: "top", color: "000000" });
+  cover.addImage({ data: logo, x: 1.47, y: pt(L.logoTop), w: 4.27, h: 2.37 });
+  cover.addText(reportTitle, { x: 0, y: at(L.titleTop, L.titleSize), w: W, h: pt(L.titleSize * 1.6), fontFace: FONT, fontSize: L.titleSize, bold: true, align: "center", valign: "top", color: "000000" });
+  const size1 = coverFontSize(page1, COVER_TEXT_BOTTOM - L.rows1Top, L.size1, L.gapLines1);
+  const top1 = at(L.rows1Top, size1);
+  cover.addText(fieldRuns(page1, size1, L.gapLines1), { x: 0, y: top1, w: W, h: H - top1, valign: "top", color: "000000" });
   if (page2.length === 0) return;
   const details = pptx.addSlide({ masterName: "APG_CONTENT" });
   addTitle(details, reportTitle);
-  details.addText(fieldRuns(page2, coverFontSize(page2, COVER_TEXT_BOTTOM - 57.5)), { x: 0, y: 0.75, w: W, h: H - 0.75, valign: "top", color: "000000" });
+  const size2 = coverFontSize(page2, COVER_TEXT_BOTTOM - L.rows2Top, L.size2, L.gapLines2);
+  const top2 = at(L.rows2Top, size2);
+  details.addText(fieldRuns(page2, size2, L.gapLines2), { x: 0, y: top2, w: W, h: H - top2, valign: "top", color: "000000" });
 }
 
 /** This app's narrative markup (see renderNarrative) as PowerPoint paragraphs. */
@@ -318,7 +338,7 @@ export async function buildDeck(scan: JobScanResult, state: JobState): Promise<B
   // Standard fields stay on the slides even when blank ("Coating:", "Prior Hours:") -- he fills
   // them in right in PowerPoint.
   const { page1, page2 } = coverPages(scan, state, { keepBlankStandard: true });
-  addCover(pptx, scan.reportType, page1, page2);
+  addCover(pptx, scan.reportType, page1, page2, state.sections.cover?.coverLayout ?? DEFAULT_COVER_LAYOUT, logo);
 
   for (const section of reportSections(scan, state)) {
     if (section.beforeCover) continue; // customer pages go in the PDF only

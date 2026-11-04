@@ -274,6 +274,8 @@ const COVER_KEY_FOR_LABEL: Record<string, string> = {
   serialnumbers: "serialNumbers", partnumbers: "partNumbers", partnumber: "partNumbers", quantity: "quantity", qty: "quantity",
   material: "material", coating: "coating", priorrepair: "priorRepair", priorrepairs: "priorRepair", priorhours: "hours",
   priorstarts: "starts", boxes: "boxes", incomingofboxes: "boxes",
+  // Alfredo Resendiz's wording (19797): "Current total Hrs", "Current Starts", "Prior job #'s".
+  currenttotalhrs: "hours", currenthrs: "hours", currenthours: "hours", currentstarts: "starts", priorjobs: "priorRepair",
 };
 
 /** The cover slides (the first slides with a "Customer:" row), read label by label. A paragraph
@@ -284,7 +286,12 @@ function coverValues(slides: DeckSlide[]): { values: Record<string, string>; lab
   const out: Record<string, string> = {};
   const labels: Record<string, string> = {};
   let assetWithPO = false;
-  const covers = slides.slice(0, 5).filter((s) => !s.hidden && /customer\s*:/i.test(s.text)).slice(0, 2);
+  // The cover, then the details slide after it -- which Alfredo Resendiz's covers (19797) start at
+  // "Turbine Model:" with no "Customer:" row.
+  const shown = slides.slice(0, 6).filter((s) => !s.hidden);
+  const first = shown.findIndex((s) => /customer\s*:/i.test(s.text));
+  const next = first >= 0 ? shown[first + 1] : undefined;
+  const covers = first < 0 ? [] : [shown[first], ...(next && /(customer|turbine model|component|material|part numbers?)\s*:/i.test(next.text) ? [next] : [])];
   covers.forEach((slide, slideIndex) => {
     const shapes = [...slide.shapes].sort((a, b) => a.y - b.y || a.x - b.x);
     for (const shape of shapes) {

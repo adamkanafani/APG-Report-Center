@@ -3,7 +3,7 @@
 // "Flow Test" (Jobs 20381, 20387, 19820) and Adan Aguirre's "Flow Test" (19886). These helpers
 // match a title against a section's own title and aliases regardless of that wording, so a past
 // report's divider names map onto this app's sections (draft/autoDraft.ts) and an edited deck's
-// divider slides are found whatever the tech rep called them (pptx/finalFromDeck.ts).
+// divider slides are found whatever the tech rep called them.
 
 /** Wording-insensitive key: lower case, letters only, "air"/"the" dropped, plurals folded. */
 export function titleKey(title: string): string {

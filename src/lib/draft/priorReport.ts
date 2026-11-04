@@ -2,6 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { parseJobMetadataFromFolderName, type JobMetadata } from "../ingest/jobMetadata";
 import { readDeck, slideTitle, type DeckSlide } from "../pptx/readDeck";
+import { readReportRecord } from "./reportRecord";
 import { toLongPath } from "../util/longPath";
 import { PREFERRED_EXAMPLE_JOBS } from "../report-templates/exemplars";
 
@@ -173,6 +174,18 @@ const REPORT_NAME = { ia: /(ia|incoming)\s*report/i, repair: /repair\s*report/i 
  * findPriorReport). Overridable with VN_WORKING_JOBS for a machine that maps the share elsewhere. */
 const DEFAULT_WORKING_JOBS = process.env.VN_WORKING_JOBS || "T:\\!Jobs!\\Working Jobs";
 
+/** The newest report PDF in `dir` that this app built (it carries a ReportRecord) -- what tech reps
+ * save now in place of a PowerPoint deck, so it's learned from ahead of any deck in the folder. */
+async function builtReport(dir: string, names: string[], kind: "ia" | "repair"): Promise<string | null> {
+  const found: Array<{ file: string; time: number }> = [];
+  for (const n of names.filter((n) => /\.pdf$/i.test(n) && REPORT_NAME[kind].test(n) && !/^~\$|^copy of|[\s_-]fs\.pdf$|- copy/i.test(n))) {
+    const file = path.join(dir, n);
+    if (!(await readReportRecord(file))) continue;
+    found.push({ file, time: (await fs.stat(toLongPath(file)).catch(() => null))?.mtimeMs ?? 0 });
+  }
+  return found.sort((a, b) => b.time - a.time)[0]?.file ?? null;
+}
+
 function deckRank(name: string): number {
   if (/\brev(ised)?\b/i.test(name)) return 0;
   return /report\.pptx$/i.test(name) ? 1 : 2;
@@ -219,10 +232,14 @@ export async function findPriorReport(jobRoot: string, metadata: JobMetadata, ki
     // The finished deck: not an Office lock file, a "Copy of"/"- Copy", or the "-FS" field-service
     // short version. A "REV"/"REVISED" deck is the corrected one, so it wins; then a plain
     // "... Report.pptx" over a variant like "... Report  hardware pictures.pptx" (Job 19163).
-    const deck = names
-      .filter((n) => /\.pptx$/i.test(n) && REPORT_NAME[kind].test(n) && !/^~\$|^copy of|[\s_-]fs\.pptx$|- copy/i.test(n))
-      .sort((a, b) => deckRank(a) - deckRank(b) || a.length - b.length)[0];
-    // MHI vs Siemens 501F: the candidate is MHI when its folder or its deck says so.
+    // A report PDF the app built comes first (see builtReport).
+    const built = await builtReport(dir, names, kind);
+    const deck = built
+      ? path.basename(built)
+      : names
+          .filter((n) => /\.pptx$/i.test(n) && REPORT_NAME[kind].test(n) && !/^~\$|^copy of|[\s_-]fs\.pptx$|- copy/i.test(n))
+          .sort((a, b) => deckRank(a) - deckRank(b) || a.length - b.length)[0];
+    // MHI vs Siemens 501F: the candidate is MHI when its folder or its report says so.
     if (deck && key.family.startsWith("MHI") !== (/\bmhi\b/i.test(c.name) || /\bmhi\b/i.test(deck))) continue;
     if (deck) return { jobNumber: c.meta.jobNumber, jobFolderName: c.name, file: path.join(dir, deck) };
   }
@@ -236,6 +253,8 @@ export async function findPriorReport(jobRoot: string, metadata: JobMetadata, ki
 export async function findOwnReport(jobRoot: string, jobNumber: string, kind: "ia" | "repair"): Promise<PriorReport | null> {
   const dir = path.join(jobRoot, REPORT_DIRS[kind]);
   const names = await fs.readdir(toLongPath(dir)).catch(() => [] as string[]);
+  const built = await builtReport(dir, names, kind);
+  if (built) return { jobNumber, jobFolderName: path.basename(jobRoot), file: built };
   const deck = names
     .filter((n) => /\.pptx$/i.test(n) && REPORT_NAME[kind].test(n) && !/^~\$|^copy of|[\s_-]fs\.pptx$|- copy/i.test(n))
     .sort((a, b) => deckRank(a) - deckRank(b) || a.length - b.length)[0];
@@ -440,6 +459,14 @@ export async function readPriorDraft(prior: PriorReport): Promise<PriorDraft> {
 }
 
 async function readPriorDraftNow(prior: PriorReport): Promise<PriorDraft> {
+  // A report this app built: everything is in its record, word for word.
+  if (/\.pdf$/i.test(prior.file)) {
+    const record = await readReportRecord(prior.file);
+    if (!record) throw new Error(`No report record in ${prior.file}`);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { version, jobNumber, reportType, ...draft } = record;
+    return { source: prior, ...draft };
+  }
   const slides = await readDeck(await fs.readFile(toLongPath(prior.file)));
   const recs = splitRecommendations(sectionMarkup(slides, /repair\s*recommendation/i));
   return {

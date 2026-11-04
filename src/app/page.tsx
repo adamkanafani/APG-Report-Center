@@ -125,7 +125,7 @@ function AppWordmark() {
 // Rotating one-liners under "Generating report…" while an export runs (anywhere from a few seconds
 // to a few minutes on a big job) -- the first line of each list says plainly what's happening; the
 // rest keep it from feeling stuck. Shop-floor themed on purpose: nozzles, vanes, heat treat, DS sheets.
-const GENERATING_QUIPS: Record<"pdf" | "deck" | "final", string[]> = {
+const GENERATING_QUIPS: Record<"pdf", string[]> = {
   pdf: [
     "Assembling every section and exhibit into the final PDF.",
     "Lining up the DS sheets in router order…",
@@ -136,25 +136,6 @@ const GENERATING_QUIPS: Record<"pdf" | "deck" | "final", string[]> = {
     "Re-assembling the nozzle. The PDF one.",
     "Running a final VPI on the page numbers…",
     "Torquing the cover page to spec…",
-  ],
-  deck: [
-    "Laying out the cover, summary, repairs, dividers and photo slides.",
-    "Placing six photos per slide, like Alfredo does…",
-    "Measuring the 7pt APG-blue rule twice, drawing it once…",
-    "Asking the segments to hold still for their photos…",
-    "Centering the divider titles at 40pt bold…",
-    "Weld-building the Engineering Summary to nominal…",
-    "Assembling the slides in the fixture…",
-  ],
-  final: [
-    "Exporting your deck through PowerPoint — a few minutes on a big job.",
-    "Slipping each DS sheet in behind its divider slide…",
-    "Asking PowerPoint nicely to hurry up…",
-    "Matching divider titles — \"Flow Test\" and \"Air Flow Test\" are on speaking terms…",
-    "Putting the customer's pages up front where they like them…",
-    "Brazing the exhibits to the slides…",
-    "Final visual inspection on every page…",
-    "Boxing it up per customer requirements…",
   ],
 };
 
@@ -1601,7 +1582,7 @@ export default function Home() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   // Which export is running (drives the overlay text); null when idle.
-  const [generating, setGenerating] = useState<null | "pdf" | "deck" | "final">(null);
+  const [generating, setGenerating] = useState<null | "pdf">(null);
   // The sidebar's inline "+ Add section" title box (see InlineTitleForm).
   const [addingSection, setAddingSection] = useState(false);
   // Which sidebar row is being dragged / currently dragged over, purely for the drag-and-drop
@@ -1729,15 +1710,11 @@ export default function Home() {
   };
 
   /** Exhibits that couldn't be embedded (an Excel-only sheet with no Excel install to print it, a
-   * met report saved as a photo, ...) and blocks whose divider slide wasn't in the edited deck --
-   * the PDF still downloads, but say what's missing. */
+   * met report saved as a photo, ...) -- the PDF still downloads, but say what's missing. */
   const reportOmissions = (res: Response) => {
     const skipped = headerList(res, "X-Skipped-Attachments");
-    const unmatched = headerList(res, "X-Unmatched-Sections");
     const notes: string[] = [];
     if (skipped.length > 0) notes.push(`These files couldn't be included:\n${skipped.join("\n")}\n\nPrint them to PDF in the same folder and try again.`);
-    if (unmatched.length > 0)
-      notes.push(`No divider slide was found for:\n${unmatched.join("\n")}\n\nTheir exhibits were left out. Keep each divider slide's title as it was generated (or re-add the slide) and build again.`);
     if (notes.length > 0) alert(`The PDF was built, but:\n\n${notes.join("\n\n")}`);
   };
 
@@ -1807,7 +1784,7 @@ export default function Home() {
     await runScan(jobRoot);
   };
 
-  // Quick PDF straight from the app, no PowerPoint step.
+  // The report PDF, built straight from the app.
   const generateReport = async () => {
     if (!jobRoot) return;
     setGenerating("pdf");
@@ -1818,41 +1795,6 @@ export default function Home() {
       reportOmissions(res);
     } catch (e) {
       alert(e instanceof Error ? e.message : "PDF generation failed");
-    } finally {
-      setGenerating(null);
-    }
-  };
-
-  // Step 1 of Alfredo's workflow: the report as an editable PowerPoint in his deck format.
-  const downloadDeck = async () => {
-    if (!jobRoot) return;
-    setGenerating("deck");
-    try {
-      const res = await fetch("/api/deck", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jobRoot, reportType }) });
-      if (!res.ok) throw new Error(await failMessage(res, "PowerPoint export failed"));
-      await saveDownload(res, `${scan?.metadata.jobNumber ?? "report"} ${reportType === "final" ? "Repair" : "IA"} Report${scan?.variant === "fs" ? " FS" : ""}.pptx`);
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "PowerPoint export failed");
-    } finally {
-      setGenerating(null);
-    }
-  };
-
-  // Step 2: his edited deck back in → finished PDF with every exhibit inserted after its divider.
-  const buildFromDeck = async (file: File) => {
-    if (!jobRoot) return;
-    setGenerating("final");
-    try {
-      const form = new FormData();
-      form.append("jobRoot", jobRoot);
-      form.append("reportType", reportType ?? "ia");
-      form.append("file", file);
-      const res = await fetch("/api/final-from-deck", { method: "POST", body: form });
-      if (!res.ok) throw new Error(await failMessage(res, "Building the PDF failed"));
-      await saveDownload(res, file.name.replace(/\.pptx$/i, ".pdf"));
-      reportOmissions(res);
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Building the PDF failed");
     } finally {
       setGenerating(null);
     }
@@ -2058,27 +2000,8 @@ export default function Home() {
             </button>
           </span>
         )}
-        <button className="secondary" disabled={generating !== null} onClick={downloadDeck}>
-          {generating === "deck" ? "Building PowerPoint..." : "1. Download PowerPoint"}
-        </button>
-        <input
-          id="edited-deck-input"
-          type="file"
-          accept=".pptx"
-          className="manual-attachment-input"
-          disabled={generating !== null}
-          onChange={(e) => {
-            // Snapshotted before clearing, so picking the same file again re-fires onChange.
-            const file = e.target.files?.[0];
-            e.target.value = "";
-            if (file) buildFromDeck(file);
-          }}
-        />
-        <label htmlFor="edited-deck-input" className={`button-like secondary ${generating !== null ? "disabled" : ""}`} title="Pick your edited PowerPoint -- the PDF gets every exhibit inserted after its divider slide">
-          2. Build PDF from edited PowerPoint…
-        </label>
-        <button className="generate-report" disabled={generating !== null} onClick={generateReport} title="Build the PDF straight from the app, without a PowerPoint step">
-          Quick PDF
+        <button className="generate-report" disabled={generating !== null} onClick={generateReport} title="Build the finished report PDF, every section and exhibit in order">
+          Generate PDF
         </button>
       </footer>
       {/* Same fill-loop mark as the initial job-scan screen, in an overlay rather than a full
@@ -2089,7 +2012,7 @@ export default function Home() {
         <div className="generating-overlay">
           <div className="generating-overlay-card">
             <AppLogoMark animated />
-            <p className="generating-overlay-text">{generating === "deck" ? "Building PowerPoint…" : "Generating report…"}</p>
+            <p className="generating-overlay-text">Generating report…</p>
             <RotatingHint key={generating} messages={GENERATING_QUIPS[generating]} />
           </div>
         </div>

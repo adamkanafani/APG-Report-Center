@@ -1783,38 +1783,6 @@ button.folder-source-tab:hover:not(.active):not(:disabled) {
   vertical-align: middle;
 }
 
-/* A <label> for a hidden file input, styled as a secondary button -- the footer's "Build PDF from
-   edited PowerPoint…" (same look as button.secondary). */
-.button-like {
-  display: inline-block;
-  padding: 9px 16px;
-  border-radius: 7px;
-  border: 1px solid #0b3d91;
-  background: white;
-  color: #0b3d91;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  cursor: pointer;
-  user-select: none;
-}
-
-.button-like:hover:not(.disabled) {
-  background: #0b3d91;
-  color: #ffffff;
-}
-
-.button-like.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
-.manual-attachment-input:focus-visible + .button-like {
-  outline: 2px solid #4f8cf0;
-  outline-offset: 2px;
-}
-
 /* Where a narrative draft's wording came from (an earlier report of the same product), above the
    editor, with the two "start over" choices beside it. */
 .seeded-note {

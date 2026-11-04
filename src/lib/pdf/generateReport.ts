@@ -1,4 +1,5 @@
 import { promises as fs } from "fs";
+import { buildReportRecord, writeReportRecord } from "../draft/reportRecord";
 import { PDFDocument } from "pdf-lib";
 import { scanJobFolder } from "../ingest/scanJobFolder";
 import { templateForJob } from "../report-templates/forJob";
@@ -66,6 +67,9 @@ export async function generateReportPdf(jobRoot: string, reportType?: string): P
   // own scan.sections order, reflecting the tech rep's custom sectionOrder), with no separate
   // end-of-document pass and no need to locate anything in an already-rendered PDF afterward.
   const finalDoc = await PDFDocument.create();
+  // What the next job of this part learns from (reportRecord.ts) -- written first, so it sits at
+  // the top of the file.
+  writeReportRecord(finalDoc, buildReportRecord(scan, state, segments.flatMap((s) => (s.kind === "html" ? [s.html] : []))));
   for (const segment of segments) {
     if (segment.kind === "html") {
       const pageBytes = await htmlToPdf(segment.html);
@@ -77,6 +81,6 @@ export async function generateReportPdf(jobRoot: string, reportType?: string): P
     }
   }
 
-  const finalBytes = await finalDoc.save();
+  const finalBytes = await finalDoc.save({ useObjectStreams: false });
   return { buffer: Buffer.from(finalBytes), skippedAttachments };
 }

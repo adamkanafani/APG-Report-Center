@@ -15,10 +15,14 @@ export interface CoverLayout {
   rows1Top: number;
   size1: number;
   gapLines1: number;
+  /** Top of the last line of text on page 1 -- the cover's rows end here whatever their count
+   * (fewer rows sit lower, as on the real covers). */
+  rows1Bottom?: number;
   /** The details page, under the page header. */
   rows2Top: number;
   size2: number;
   gapLines2: number;
+  rows2Bottom?: number;
 }
 
 /** Adan's 20992 cover -- used until an author's own report has been measured. */
@@ -29,6 +33,7 @@ export const DEFAULT_COVER_LAYOUT: CoverLayout = {
   rows1Top: 249,
   size1: 24,
   gapLines1: 1,
+  rows1Bottom: 652,
   rows2Top: 57.5,
   size2: 24,
   gapLines2: 1,
@@ -61,7 +66,9 @@ function rowLayout(items: Item[], below: number) {
   // The closest two labels are two single-line rows: their distance is one line plus the gap.
   const pitch = Math.min(...labels.slice(1).map((l, k) => l.top - labels[k].top).filter((d) => d > line * 0.9));
   if (!Number.isFinite(pitch)) return null;
-  return { top: labels[0].top, size, gapLines: Math.max(0, Math.round(((pitch - line) / line) * 4) / 4) };
+  // The last line of text in the rows (a wrapped value can run below its label).
+  const bottom = Math.max(...items.filter((i) => i.top >= labels[0].top - 1 && i.top < 705).map((i) => i.top));
+  return { top: labels[0].top, size, gapLines: Math.max(0, Math.round(((pitch - line) / line) * 4) / 4), bottom };
 }
 
 /** The topmost picture on a page (the logo), from the page's drawing operations. */
@@ -116,12 +123,13 @@ export async function measureCoverLayout(pdfPath: string): Promise<CoverLayout |
           rows1Top: rows.top,
           size1: rows.size,
           gapLines1: rows.gapLines,
+          rows1Bottom: rows.bottom,
         };
         continue;
       }
       // The details page: rows under the page header (44pt logo band and its bars).
       const rows = rowLayout(items, 50);
-      if (rows) layout = { ...layout, rows2Top: rows.top, size2: rows.size, gapLines2: rows.gapLines };
+      if (rows) layout = { ...layout, rows2Top: rows.top, size2: rows.size, gapLines2: rows.gapLines, rows2Bottom: rows.bottom };
       break;
     }
     await doc.destroy();

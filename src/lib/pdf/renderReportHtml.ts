@@ -1,6 +1,6 @@
 import { inlineHtml, isHeadingLine, stripInline } from "../draft/inlineFormat";
 import { wrapBold } from "./textMeasure";
-import { DEFAULT_COVER_LAYOUT } from "./coverLayout";
+import { DEFAULT_COVER_LAYOUT, type CoverLayout } from "./coverLayout";
 import { promises as fs } from "fs";
 import path from "path";
 import sharp from "sharp";
@@ -429,6 +429,32 @@ export function coverFontSize(fields: Array<{ label: string; value: string }>, a
   return 12;
 }
 
+type CoverRows = Array<{ label: string; value: string }>;
+
+/** Where both cover pages' rows go, the same for every part. Page 1's rows end where the author's
+ * do (CoverLayout.rows1Bottom) -- a cover with fewer rows than theirs sits lower, not short of the
+ * bottom (20062, a support ring with no Unit row) -- and may climb as high as just under the title
+ * before the text gets smaller. The details page uses the same text size as page 1, starting under
+ * the header, with the author's row spacing or as close to it as fits. */
+export function coverPlacement(page1: CoverRows, page2: CoverRows, L: CoverLayout) {
+  const height = (fields: CoverRows, size: number, gap: number) =>
+    (fields.reduce((n, f) => n + f.value.split("\n").reduce((m, l) => m + wrapBold(l, size, COVER_VALUE_WIDTH).length, 0), 0) + (fields.length - 1) * gap) * size * 1.2;
+  const highest = L.titleTop + L.titleSize * 2;
+  const end1 = Math.min(COVER_TEXT_BOTTOM, (L.rows1Bottom ?? DEFAULT_COVER_LAYOUT.rows1Bottom!) + L.size1 * 1.2);
+  const fits1 = coverFontSize(page1, end1 - highest, L.size1, L.gapLines1);
+  const room2 = COVER_TEXT_BOTTOM - L.rows2Top;
+  const size = page2.length > 0 ? Math.min(fits1, coverFontSize(page2, room2, fits1, Math.min(1, L.gapLines2))) : fits1;
+  let gap2 = Math.max(L.gapLines2, 1);
+  while (gap2 > Math.min(1, L.gapLines2) && height(page2, size, gap2) > room2) gap2 -= 0.25;
+  return {
+    size,
+    top1: Math.max(highest, end1 - height(page1, size, L.gapLines1)),
+    gap1: L.gapLines1,
+    top2: L.rows2Top,
+    gap2,
+  };
+}
+
 export function coverPages(
   scan: JobScanResult,
   state: JobState,
@@ -583,7 +609,7 @@ export async function renderReportSegments(scanIn: JobScanResult, state: JobStat
   // Laid out the way this author's own covers are (measured off their last report -- see
   // coverLayout.ts): logo, title and rows at their positions, their text sizes, their row spacing.
   const L = state.sections.cover?.coverLayout ?? DEFAULT_COVER_LAYOUT;
-  const size1 = coverFontSize(page1, COVER_TEXT_BOTTOM - L.rows1Top, L.size1, L.gapLines1);
+  const place = coverPlacement(page1, page2, L);
   // Chrome sets a line's text about 0.15em lower in its box than the measured top (coverLayout.ts
   // ASCENT), less half the leading -- measured on 19797 and 20992.
   const rowsAt = (top: number, size: number) => top + 0.125 * size;
@@ -592,14 +618,13 @@ export async function renderReportSegments(scanIn: JobScanResult, state: JobStat
     <section class="cover cover-fixed">
       <img class="cover-logo" src="${logo}" alt="APG" style="top: ${L.logoTop}pt" />
       <h1 style="top: ${L.titleTop + 0.15 * L.titleSize}pt; font-size: ${L.titleSize}pt">${escapeHtml(scan.reportType)}</h1>
-      <div class="cover-fields" style="top: ${rowsAt(L.rows1Top, size1)}pt; ${rowsStyle(size1, L.gapLines1)}">${coverRowsHtml(page1)}</div>
+      <div class="cover-fields" style="top: ${rowsAt(place.top1, place.size)}pt; ${rowsStyle(place.size, place.gap1)}">${coverRowsHtml(page1)}</div>
     </section>`);
   if (page2.length > 0) {
-    const size2 = coverFontSize(page2, COVER_TEXT_BOTTOM - L.rows2Top, L.size2, L.gapLines2);
     bodyParts.push(`
       <section class="cover cover-continued cover-fixed report-page">
         ${pageHeader(scan.reportType, logo)}
-        <div class="cover-fields" style="top: ${rowsAt(L.rows2Top, size2)}pt; ${rowsStyle(size2, L.gapLines2)}">${coverRowsHtml(page2)}</div>
+        <div class="cover-fields" style="top: ${rowsAt(place.top2, place.size)}pt; ${rowsStyle(place.size, place.gap2)}">${coverRowsHtml(page2)}</div>
       </section>`);
   }
 

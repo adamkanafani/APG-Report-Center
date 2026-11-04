@@ -81,11 +81,13 @@ async function pdfBeside(deckPath: string): Promise<string | null> {
  * else the last same-product report. */
 async function learnCover(scan: JobScanResult, template: ReportTemplate): Promise<void> {
   const cover = (await loadJobState(scan.jobRoot)).sections.cover;
-  if (cover?.coverLayout && cover.fieldLabelsExact) return;
+  // A layout measured before the app knew where the rows end (rows1Bottom) is measured again.
+  const stale = cover?.coverLayout && cover.coverLayout.rows1Bottom === undefined;
+  if (cover?.coverLayout && cover.fieldLabelsExact && !stale) return;
   const repair = /repair/i.test(template.reportType);
   const source = (await ownIaDraftFor(scan, template.reportType)) ?? (repair ? await priorRepairDeckFor(scan) : await priorDraftFor(scan));
   if (!source) return;
-  const pdf = cover?.coverLayout ? null : await pdfBeside(source.source.file);
+  const pdf = cover?.coverLayout && !stale ? null : /\.pdf$/i.test(source.source.file) ? source.source.file : await pdfBeside(source.source.file);
   const layout = pdf ? await measureCoverLayout(pdf) : null;
   await mutateJobState(scan.jobRoot, (state) => {
     const c = { ...state.sections.cover };
@@ -93,7 +95,7 @@ async function learnCover(scan: JobScanResult, template: ReportTemplate): Promis
     // "Customer:" row) are read again along with it.
     const relearn = !c.fieldLabelsExact || (!c.coverLayout && Boolean(layout));
     if (relearn && Object.keys(source.coverLabelsExact).length > 0) c.fieldLabelsExact = { ...c.fieldLabelsExact, ...source.coverLabelsExact };
-    if (!c.coverLayout && layout) c.coverLayout = layout;
+    if ((!c.coverLayout || c.coverLayout.rows1Bottom === undefined) && layout) c.coverLayout = layout;
     if (c.assetWithPO === undefined) c.assetWithPO = source.assetWithPO;
     state.sections.cover = c;
   });

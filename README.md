@@ -1,42 +1,51 @@
-# Vanes & Nozzles Report Builder
+# APG Report Center
 
-The Vanes & Nozzles (V&N) version of APG's report builder. It uses the same shell, look and workflow as the Tech Rep (buckets) Report Builder, built around how the V&N team finishes reports: **in PowerPoint**.
+One app for Allied Power Group's report builders. The home screen asks for the line of business,
+then the report builder:
 
-The two report types are:
-- **I&A Report** → the **"Incoming Report"** (inspect & advise)
-- **Final Report** → the **"Repair Report"** (the completion deliverable)
+| Line of business | Builders |
+|---|---|
+| Parts | Vanes & Nozzles (nozzles, vanes, compressor diaphragms, blade rings, ISOs, air seals, support rings); Buckets & Blades |
+| Repair | The Parts builders, until Repair has its own |
+| Inspection | ATS Borescope Report Builder and ATS Report Reviewer (moving in next) |
+| Field Service | Coming soon |
+| Generator | Coming soon |
 
-## Workflow
+The lines of business and their builders are listed in `src/app/(home)/lobs.ts`.
 
-1. **Pick the report type and the job folder.** The app scans the folder, finds every exhibit and drafts the narrative sections.
-2. **Review in the app.** Tick, untick and reorder exhibits, check the drafts, fill in the cover.
-3. **1. Download PowerPoint.** This gives an editable deck in Alfredo Resendiz's own format:
-   - cover and component-details slides
-   - Incoming Engineering Summary
-   - Repair Recommendations / Repair Summary
-   - a divider slide per exhibit block
-   - photo slides, 6 per slide
-4. **Edit the deck in PowerPoint** as usual: fix anything the floor got wrong, add customer-specific lines, move photos. Save it.
-5. **2. Build PDF from edited PowerPoint….** Pick the saved deck:
-   - PowerPoint exports it.
-   - The app inserts every block's real completed forms (DS sheets, NDT reports, heat treat charts, coating cert, …) right after that block's divider slide.
-   - Customer front pages (e.g. Calpine's Repair Detail Summary) go ahead of the cover.
-   - Divider slides are found by their text, so **keep each divider's title as generated**. Everything else in the deck can be edited, reordered or deleted.
+## How the code is laid out
 
-**Quick PDF** skips the PowerPoint step and builds the PDF straight from the app.
+Each builder keeps its own screens, styles, API and library, so they can't step on each other:
+
+| Builder | Screens | API | Library | Saved job state |
+|---|---|---|---|---|
+| Home screens | `src/app/(home)` | -- | -- | -- |
+| Vanes & Nozzles | `src/app/(vanes-nozzles)` → `/parts/vanes-nozzles` | `/api/vn/*` | `src/lib` | `%LOCALAPPDATA%\VNReportApp` |
+| Buckets & Blades | `src/app/(buckets-blades)` → `/parts/buckets-blades` | `/api/bb/*` | `src/bucketsBlades/lib` | `%LOCALAPPDATA%\TechRepReportApp` |
+
+Each `(group)` folder has its own root layout and stylesheet; moving between builders is a full page
+load, so one builder's CSS never reaches another's pages. Both builders' saved state stays where the
+old standalone apps kept it, so reviews in progress carry over.
+
+# Vanes & Nozzles builder
+
+Built around how the V&N tech reps write their reports (Alfredo Resendiz on nozzles and support rings;
+Adan Aguirre and Elmer Gomez on vanes, compressor diaphragms, blade rings, ISOs and air seals). The two
+report types are the I&A Report ("Incoming Report") and the Final Report ("Repair Report").
+Generate PDF builds the finished report straight from the app, and each report the app builds
+carries a record that the next job of the same part learns from.
 
 ## Setup
 
 ```bash
 npm install
-npm run dev -- -p 3001
+npm run dev -- -p 3002
 ```
 
-Open http://localhost:3001. Port 3001 lets it run next to the Tech Rep app, which uses 3000. For day-to-day use, see `SETUP.md`: double-click `Setup - Run This First.bat` once, then `Start Report Builder.bat`.
+Open http://localhost:3002. Port 3002 keeps it clear of the old standalone apps (3000 and 3001) while people move over. For day-to-day use, see `SETUP.md`: double-click `Setup - Run This First.bat` once, then `Start Report Center.bat`.
 
 Requirements:
 - **Chrome or Edge**, for PDF rendering.
-- **Desktop PowerPoint**, for "Build PDF from edited PowerPoint".
 - **Desktop Excel**, only for exhibits that exist only as `.xlsx` (common for final DS sheets). They're printed through Excel; without it they're listed as skipped.
 - `ANTHROPIC_API_KEY` is optional:
   - It's only used for "Revise with instruction" and for photo duplicate/blur screening.

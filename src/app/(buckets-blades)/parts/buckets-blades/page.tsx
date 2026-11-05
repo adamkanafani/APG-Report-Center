@@ -1,18 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { JobScanResult, SectionScanResult } from "@/lib/ingest/scanJobFolder";
-import type { JobFile } from "@/lib/ingest/fileWalk";
-import { COVER_FIELD_ORDER } from "@/lib/ingest/jobMetadata";
-import type { SectionState } from "@/lib/state/jobState";
-import { effectiveMultiSelection, isExcluded } from "@/lib/state/selection";
-import { PhotoPagePicker } from "./PhotoPagePicker";
-import { RichTextEditor } from "./RichTextEditor";
+import type { JobScanResult, SectionScanResult } from "@/bucketsBlades/lib/ingest/scanJobFolder";
+import type { JobFile } from "@/bucketsBlades/lib/ingest/fileWalk";
+import { COVER_FIELD_ORDER } from "@/bucketsBlades/lib/ingest/jobMetadata";
+import type { SectionState } from "@/bucketsBlades/lib/state/jobState";
 
 type SectionWithState = SectionScanResult & { state: SectionState };
 type ScanResponse = Omit<JobScanResult, "sections"> & { sections: SectionWithState[]; sectionOrder?: string[] };
 
-// Kept as a small literal here rather than importing from "@/lib/report-templates" -- this is a
+// Kept as a small literal here rather than importing from "@/bucketsBlades/lib/report-templates" -- this is a
 // client component, and the two ids are all it actually needs; resolving which real
 // ReportTemplate each one maps to happens entirely server-side (see resolveReportTemplate).
 type ReportTypeId = "ia" | "final";
@@ -20,21 +17,27 @@ const REPORT_TYPE_OPTIONS: Array<{ id: ReportTypeId; label: string; description:
   {
     id: "ia",
     label: "I&A Report",
-    description: "Incoming Report — inspect & advise",
+    description: "Inspect & Advise",
   },
   {
     id: "final",
     label: "Final Report",
-    description: "Repair Report — the completion deliverable",
+    description: "The completion deliverable",
   },
 ];
 
 function ReportTypePicker({ onChosen }: { onChosen: (id: ReportTypeId) => void }) {
   return (
     <div className="folder-picker">
+      <a className="home-link" href="/">
+        ← Report Center
+      </a>
       <div className="app-logo">
         <AppLogoMark />
-        <AppWordmark />
+        <div className="app-wordmark">
+          <span className="app-wordmark-eyebrow">Buckets &amp; Blades</span>
+          <h1>Report Builder</h1>
+        </div>
       </div>
       <div className="app-logo-bar" />
       <p className="folder-picker-subtitle">Which report are you building?</p>
@@ -56,8 +59,7 @@ function ReportTypePicker({ onChosen }: { onChosen: (id: ReportTypeId) => void }
  * it out with the ✕), or "empty" (a table section with no data and no completed form to embed --
  * renderReportHtml.ts leaves these out automatically). Mirrors that file's own checks. */
 function omittedReason(s: SectionWithState): "removed" | "empty" | null {
-  if (isExcluded(s, s.state)) return "removed";
-  if (s.generation === "attach-multi" && effectiveMultiSelection(s, s.state).length === 0) return "empty";
+  if (s.state.excludeFromReport) return "removed";
   if (s.generation === "table-from-source") {
     const printPdfInUse = Boolean(s.printPdfFile) && !s.state.excludePrintPdf;
     if (!printPdfInUse && (!s.parsedTable || s.parsedTable.rows.length === 0)) return "empty";
@@ -103,96 +105,7 @@ function AppLogoMark({ animated }: { animated?: boolean }) {
   return (
     <span className="app-logo-mark">
       <img src="/apg-mark-transparent.png" alt="" className="app-logo-mark-img app-logo-mark-base" />
-      {/* The color copy sits in a window that slides down over the mark (see .app-logo-mark-window). */}
-      <span className="app-logo-mark-window">
-        <img src="/apg-mark-transparent.png" alt="" className="app-logo-mark-img app-logo-mark-fill" />
-      </span>
-    </span>
-  );
-}
-
-/** "Report Builder" wordmark with the service-line eyebrow above it -- the one visible branding
- * difference from the Tech Rep (buckets/blades) app this shell is shared with. */
-function AppWordmark() {
-  return (
-    <div className="app-wordmark">
-      <span className="app-wordmark-eyebrow">Vanes &amp; Nozzles</span>
-      <h1>Report Builder</h1>
-    </div>
-  );
-}
-
-// Rotating one-liners under "Generating report…" while an export runs (anywhere from a few seconds
-// to a few minutes on a big job) -- the first line of each list says plainly what's happening; the
-// rest keep it from feeling stuck. Shop-floor themed on purpose: nozzles, vanes, heat treat, DS sheets.
-const GENERATING_QUIPS: Record<"pdf", string[]> = {
-  pdf: [
-    "Assembling every section and exhibit into the final PDF.",
-    "Lining up the DS sheets in router order…",
-    "Checking butt gaps on the page breaks…",
-    "Heat-treating the charts. Preweld cycle first, naturally.",
-    "Flow-testing the margins — all within APG criteria.",
-    "Blasting off the residual whitespace with 80–120 grit…",
-    "Re-assembling the nozzle. The PDF one.",
-    "Running a final VPI on the page numbers…",
-    "Torquing the cover page to spec…",
-  ],
-};
-
-/** Cycles through `messages` every few seconds with a quick fade -- remounted (keyed) per export
- * kind so each run starts on its plain-English first line. */
-function RotatingHint({ messages }: { messages: string[] }) {
-  const [index, setIndex] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setIndex((i) => (i + 1) % messages.length), 3200);
-    return () => clearInterval(id);
-  }, [messages.length]);
-  return (
-    <p key={index} className="generating-overlay-hint rotating-hint">
-      {messages[index]}
-    </p>
-  );
-}
-
-/** An inline title box with Save / Cancel -- used for adding and renaming sections instead of the
- * browser's prompt(), which some browsers (the app's own preview pane included) don't support.
- * Enter saves, Esc cancels. */
-function InlineTitleForm({
-  initial = "",
-  placeholder,
-  submitLabel,
-  onSubmit,
-  onCancel,
-}: {
-  initial?: string;
-  placeholder: string;
-  submitLabel: string;
-  onSubmit: (title: string) => void;
-  onCancel: () => void;
-}) {
-  const [value, setValue] = useState(initial);
-  const submit = () => {
-    if (value.trim()) onSubmit(value.trim());
-  };
-  return (
-    <span className="inline-title-form">
-      <input
-        type="text"
-        autoFocus
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") submit();
-          if (e.key === "Escape") onCancel();
-        }}
-      />
-      <button type="button" disabled={!value.trim()} onClick={submit}>
-        {submitLabel}
-      </button>
-      <button type="button" className="secondary" onClick={onCancel}>
-        Cancel
-      </button>
+      <img src="/apg-mark-transparent.png" alt="" className="app-logo-mark-img app-logo-mark-fill" />
     </span>
   );
 }
@@ -233,7 +146,7 @@ function FolderPicker({ onJobFolderChosen, onBack }: { onJobFolderChosen: (path:
     setQuery("");
     setSearchResults(null);
     try {
-      const url = target ? `/api/browse?dir=${encodeURIComponent(target)}` : "/api/browse";
+      const url = target ? `/api/bb/bb/browse?dir=${encodeURIComponent(target)}` : "/api/bb/bb/browse";
       const res = await fetch(url);
       const data = await res.json();
       if (!res.ok) {
@@ -270,27 +183,19 @@ function FolderPicker({ onJobFolderChosen, onBack }: { onJobFolderChosen: (path:
       return;
     }
     setSearching(true);
-    // A newer keystroke cancels the older search, so a slow earlier query ("2") can't land after
-    // and overwrite the results for the one actually typed ("20992").
-    const controller = new AbortController();
     const handle = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/browse?dir=${encodeURIComponent(dir)}&q=${encodeURIComponent(query.trim())}`, { signal: controller.signal });
+        const res = await fetch(`/api/bb/bb/browse?dir=${encodeURIComponent(dir)}&q=${encodeURIComponent(query.trim())}`);
         const data = await res.json();
-        if (res.ok && !controller.signal.aborted) {
+        if (res.ok) {
           setSearchResults(data.results ?? []);
           setSearchTruncated(!!data.truncated);
         }
-      } catch {
-        // aborted by a newer keystroke
       } finally {
-        if (!controller.signal.aborted) setSearching(false);
+        setSearching(false);
       }
     }, 300);
-    return () => {
-      clearTimeout(handle);
-      controller.abort();
-    };
+    return () => clearTimeout(handle);
   }, [query, dir, isDriveList]);
 
   const searchActive = searchResults !== null;
@@ -299,7 +204,10 @@ function FolderPicker({ onJobFolderChosen, onBack }: { onJobFolderChosen: (path:
     <div className="folder-picker">
       <div className="app-logo">
         <AppLogoMark />
-        <AppWordmark />
+        <div className="app-wordmark">
+          <span className="app-wordmark-eyebrow">Buckets &amp; Blades</span>
+          <h1>Report Builder</h1>
+        </div>
       </div>
       <div className="app-logo-bar" />
       <p className="folder-picker-subtitle">Pick the job folder to scan.</p>
@@ -330,7 +238,7 @@ function FolderPicker({ onJobFolderChosen, onBack }: { onJobFolderChosen: (path:
           <div className="folder-search">
             <input
               type="text"
-              className={`folder-search-input ${searching ? "searching" : ""}`}
+              className="folder-search-input"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search job folders inside here…"
@@ -409,18 +317,34 @@ function chunkRows<T>(rows: T[], numChunks: number): T[][] {
 // that tab (see scanJobFolder.ts's OPTIONAL_SUBSHEET_PARSERS handling of manualPdf) and embedded
 // outright, overriding whatever the xlsx tab itself parsed to.
 const MANUAL_ATTACHMENT_SECTIONS = new Set([
-  "customerPages",
-  "incomingAirflow",
+  "chemTest",
+  "crackMap",
   "serialNumberList",
-  "incomingDimensional",
-  "incomingNdt",
-  "heatTreatCharts",
+  "scrapReport",
+  "snRecordingSheet",
+  "heightDimForm",
+  "dovetailDimension",
+  "zDropDimension",
+  "wallThickness",
   "metallurgicalReport",
-  "finalDimensional",
+  "airflowReport",
+  // Final Report's own sections -- same reasoning as their I&A counterparts above.
+  "finalSerialNumberList",
+  "finalScrapReport",
+  "finalHeightDimForm",
+  "finalWallThickness",
+  "finalAirflowReport",
+  "preWeldHeatTreatChart",
+  "postWeldHeatTreatChart",
+  "xRayInspection",
   "finalNdt",
-  "finalAirflow",
-  "finalHeatTreatCharts",
+  "zNotchDimensions",
+  "postCoatHeatTreatChart",
+  "finalAgeHeatTreatChart",
   "coatingCertification",
+  "shotPeenAlSealStripCert",
+  "damperPinCheck",
+  "finalMomentWeigh",
 ]);
 
 function ManualAttachmentUpload({
@@ -454,7 +378,7 @@ function ManualAttachmentUpload({
       form.append("jobRoot", jobRoot);
       form.append("sectionId", sectionId);
       for (const file of files) form.append("file", file);
-      const res = await fetch("/api/manual-attachment", { method: "POST", body: form });
+      const res = await fetch("/api/bb/bb/manual-attachment", { method: "POST", body: form });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Upload failed");
       // The file(s) now sit inside the job folder itself (see manualAttachmentsFor's convention),
@@ -498,7 +422,7 @@ function ManualAttachmentUpload({
   const removeFile = async (baseName: string) => {
     setRemoving(baseName);
     try {
-      const res = await fetch("/api/manual-attachment", {
+      const res = await fetch("/api/bb/bb/manual-attachment", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobRoot, sectionId, fileName: baseName }),
@@ -642,7 +566,7 @@ function TablePreview({
   const save = async () => {
     setBusy(true);
     try {
-      await fetch("/api/section-state", {
+      await fetch("/api/bb/bb/section-state", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobRoot, sectionId: section.id, patch: { tableEdits: edits, tableNotes: notesText } }),
@@ -659,9 +583,10 @@ function TablePreview({
     }
   };
 
-  // The bucket line's DS-0554 serial list printed as three parallel column blocks; V&N's DS-0404
-  // is a single five-column table, so this stays at one block (kept as a knob for other forms).
-  const columnBlocks = 1;
+  // Serial Number List is a long, simple 3-column list (matching the real DS-0554 form, which
+  // itself lays it out as three parallel column blocks) -- reflowing it the same way here keeps
+  // the on-screen review matching what actually prints, instead of one tall single column.
+  const columnBlocks = section.id === "serialNumberList" && table.rows.length > 3 ? 3 : 1;
   // chunkRows slices rows into sequential ranges (chunk 0 = rows[0..perChunk-1], chunk 1 =
   // rows[perChunk..2*perChunk-1], ...), so a row's real index -- the one edits are keyed
   // against -- is derivable from its chunk and its position within it, without chunkRows itself
@@ -774,31 +699,26 @@ function NarrativeEditor({
   jobRoot,
   section,
   onUpdated,
-  reportType,
-  fsText,
+  turbineModel,
 }: {
   jobRoot: string;
   section: SectionWithState;
   onUpdated: (content: string) => void;
-  reportType: ReportTypeId;
-  /** Editing the Fleet Service version's own shorter text (SectionState.compactContent). */
-  fsText: boolean;
+  turbineModel: string;
 }) {
   // Keyed by section.id in SectionPanel below, so this remounts (and re-derives its initial
   // state from `section`) whenever the reviewer switches sections — no sync effect needed.
-  const [draft, setDraft] = useState((fsText && section.state.compactContent) || section.state.content || "");
+  const [draft, setDraft] = useState(section.state.content ?? "");
   const [instruction, setInstruction] = useState("");
   const [busy, setBusy] = useState(false);
 
   const runDraft = async (withInstruction?: string) => {
     setBusy(true);
     try {
-      const res = await fetch("/api/draft", {
+      const res = await fetch("/api/bb/bb/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // reportType too, so the server re-scans against this report's own section list rather than
-        // defaulting to the I&A Report's (resolveReportTemplate's fallback).
-        body: JSON.stringify({ jobRoot, sectionId: section.id, instruction: withInstruction, reportType }),
+        body: JSON.stringify({ jobRoot, sectionId: section.id, instruction: withInstruction }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -815,10 +735,10 @@ function NarrativeEditor({
   const saveManualEdit = async () => {
     setBusy(true);
     try {
-      await fetch("/api/section-state", {
+      await fetch("/api/bb/bb/section-state", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobRoot, sectionId: section.id, patch: { [fsText ? "compactContent" : "content"]: draft, draftError: null } }),
+        body: JSON.stringify({ jobRoot, sectionId: section.id, patch: { content: draft, draftError: null } }),
       });
       onUpdated(draft);
     } finally {
@@ -826,82 +746,15 @@ function NarrativeEditor({
     }
   };
 
-  // Throw the current text away and redraft: "auto" starts from the last report of the same
-  // product again (this job's own recommendations, for the Repair Summary), "router" uses only
-  // this job's routers.
-  // Asked inline (see pendingStartOver below) rather than with the browser's confirm().
-  const [pendingStartOver, setPendingStartOver] = useState<"auto" | "router" | null>(null);
-  const requestStartOver = (source: "auto" | "router") => (draft.trim() ? setPendingStartOver(source) : startOver(source));
-  const startOver = async (source: "auto" | "router") => {
-    setPendingStartOver(null);
-    setBusy(true);
-    try {
-      const res = await fetch("/api/draft", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobRoot, sectionId: section.id, reportType, source }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setDraft(data.content ?? "");
-      onUpdated(data.content ?? "");
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Draft failed");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
     <div>
-      {fsText && (
-        <p className="confidence-note">
-          FS version: this is the shorter list printed in the Fleet Service copy. Edits here change only the FS report.
-        </p>
-      )}
-      <div className="seeded-note">
-        <span>
-          {section.state.seededFrom?.startsWith("this job") ? (
-            <>
-              Started from <strong>{section.state.seededFrom}</strong>.
-            </>
-          ) : section.state.seededFrom ? (
-            <>
-              Started from <strong>{section.state.seededFrom}</strong> — same product, earlier job. Measured values were filled in where this job&apos;s sheets
-              have them; anything in [brackets] is the old job&apos;s value — check it.
-            </>
-          ) : (
-            "Drafted from this job's routers — no earlier report of the same product was found."
-          )}
-        </span>
-        {pendingStartOver ? (
-          <span className="inline-confirm">
-            Replace the current text? Your edits to this section will be lost.
-            <button type="button" disabled={busy} onClick={() => startOver(pendingStartOver)}>
-              Replace
-            </button>
-            <button type="button" className="secondary" onClick={() => setPendingStartOver(null)}>
-              Cancel
-            </button>
-          </span>
-        ) : (
-          <>
-            <button type="button" className="secondary" disabled={busy} onClick={() => requestStartOver("auto")}>
-              Start over from last report
-            </button>
-            <button type="button" className="secondary" disabled={busy} onClick={() => requestStartOver("router")}>
-              Start over from router
-            </button>
-          </>
-        )}
-      </div>
       {section.state.draftError && !draft && (
         <p className="confidence-note" style={{ color: "#a4141a" }}>
           ⚠ Automatic draft generation didn&apos;t produce a draft for this section: {section.state.draftError} Write it manually below, or use &quot;Revise with
           instruction&quot; to ask Claude for a fresh attempt.
         </p>
       )}
-      <RichTextEditor initialValue={draft} onChange={setDraft} placeholder="No draft yet — flagged for manual review." />
+      <textarea className="draft-textarea" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="No draft yet — flagged for manual review." />
       <div className="toolbar">
         <button className="secondary" disabled={busy} onClick={saveManualEdit}>
           Save Edit
@@ -918,20 +771,168 @@ function NarrativeEditor({
           Revise with instruction
         </button>
       </div>
+      {section.id === "iaSummary" && <StandardDiagramToggle jobRoot={jobRoot} section={section} turbineModel={turbineModel} />}
     </div>
   );
 }
 
-function PhotoSetEditor({ jobRoot, section, reportType }: { jobRoot: string; section: SectionWithState; reportType: ReportTypeId }) {
-  // No separate section-reason paragraph here -- SectionPanel already shows section.statusReason.
+// Every real 7FA I&A report includes the same fixed reference diagram on its Engineering Summary
+// page (see renderReportHtml.ts's renderStandardDiagram) -- this mirrors that same 7FA check so
+// the toggle only shows up on the jobs it actually applies to.
+const SEVEN_FA_PATTERN = /^F?7FA/i;
+
+/** Lets the tech rep turn APG's standard 7FA modification-reference diagram on or off for this
+ * job's I&A Summary page. On by default for any 7FA job (matching the real completed report,
+ * which always includes it) -- this is a fixed illustration, not one of the job's own photos, so
+ * there's nothing to pick, just whether to include it. */
+function StandardDiagramToggle({ jobRoot, section, turbineModel }: { jobRoot: string; section: SectionWithState; turbineModel: string }) {
+  const isSevenFA = SEVEN_FA_PATTERN.test(turbineModel.trim());
+  // Keyed by section.id in SectionPanel below, so a section switch remounts this fresh.
+  const [included, setIncluded] = useState(section.state.includeStandardDiagram ?? isSevenFA);
+  const [busy, setBusy] = useState(false);
+
+  if (!isSevenFA) return null;
+
+  const toggle = async () => {
+    const next = !included;
+    setIncluded(next);
+    setBusy(true);
+    try {
+      await fetch("/api/bb/bb/section-state", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobRoot, sectionId: "iaSummary", patch: { includeStandardDiagram: next } }),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="standard-diagram-toggle">
+      <h3 style={{ fontSize: 14, margin: "20px 0 4px" }}>Standard 7FA Reference Diagram</h3>
+      <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: busy ? "default" : "pointer" }}>
+        <input type="checkbox" checked={included} disabled={busy} onChange={toggle} />
+        <span className="file-count" style={{ margin: 0 }}>
+          Include APG&apos;s standard 7FA modification-reference diagram on this page — every 7FA report includes it by
+          default; uncheck to leave it out for this job.
+        </span>
+      </label>
+      {included && (
+        <img
+          src="/reference/7fa-modification-diagram.png"
+          alt="Standard 7FA modification-reference diagram"
+          style={{ maxWidth: 320, marginTop: 8, border: "1px solid #ccc", borderRadius: 4 }}
+        />
+      )}
+    </div>
+  );
+}
+
+const PHOTOS_PER_PAGE = 60;
+
+function PhotoSetEditor({ jobRoot, section }: { jobRoot: string; section: SectionWithState }) {
+  // Keyed by section.id in SectionPanel below, so a section switch remounts this fresh.
+  const [selected, setSelected] = useState<string[]>(section.state.selectedPhotoPaths ?? []);
+  const [filter, setFilter] = useState<"all" | "selected">("all");
+  const [page, setPage] = useState(0);
+  const [showAll, setShowAll] = useState(false);
+
+  const toggle = async (relativePath: string) => {
+    const next = selected.includes(relativePath) ? selected.filter((p) => p !== relativePath) : [...selected, relativePath];
+    setSelected(next);
+    await fetch("/api/bb/bb/section-state", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jobRoot, sectionId: section.id, patch: { selectedPhotoPaths: next } }),
+    });
+  };
+
+  const changeFilter = (next: "all" | "selected") => {
+    setFilter(next);
+    setPage(0);
+  };
+
+  // "selected" is whatever's currently checked -- the AI's initial pick, plus any manual
+  // adjustments the tech rep has made since -- so this filter always reflects the live set,
+  // not a frozen snapshot of the original auto-selection.
+  const filtered = filter === "selected" ? section.matchedFiles.filter((f) => selected.includes(f.relativePath)) : section.matchedFiles;
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PHOTOS_PER_PAGE));
+  const clampedPage = Math.min(page, totalPages - 1);
+  const shown = showAll ? filtered : filtered.slice(clampedPage * PHOTOS_PER_PAGE, clampedPage * PHOTOS_PER_PAGE + PHOTOS_PER_PAGE);
+
   return (
     <div>
-      {section.state.draftError && reportType === "ia" && (
+      {/* No section-reason paragraph here -- SectionPanel already shows section.statusReason
+          once, generically, above whichever type-specific editor renders (this one included).
+          A second copy here was printing "N candidate photo(s) found..." twice in a row. */}
+      {section.state.draftError && (
         <p className="confidence-note" style={{ color: "#a4141a" }}>
-          ⚠ Automatic photo pre-selection didn&apos;t run: {section.state.draftError} Pick photos below.
+          ⚠ Automatic photo pre-selection didn&apos;t run: {section.state.draftError} Select photos manually below.
         </p>
       )}
-      <PhotoPagePicker jobRoot={jobRoot} section={section} reportType={reportType} />
+      <p className="file-count">
+        Incoming/NDT photos are preselected automatically, minus duplicates and unusable shots — click any photo to toggle it in/out of the final selection.{" "}
+        {selected.length} selected.
+      </p>
+
+      <div className="photo-filter-tabs">
+        <button className={`photo-filter-tab ${filter === "selected" ? "active" : ""}`} onClick={() => changeFilter("selected")}>
+          Selected ({selected.length})
+        </button>
+        <button className={`photo-filter-tab ${filter === "all" ? "active" : ""}`} onClick={() => changeFilter("all")}>
+          All ({section.matchedFiles.length})
+        </button>
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="file-count">No photos in this view yet — toggle some on from &quot;All&quot;.</p>
+      ) : (
+        <div className="photo-grid">
+          {shown.map((f) => (
+            <div key={f.relativePath} className={`photo-tile ${selected.includes(f.relativePath) ? "selected" : ""}`} onClick={() => toggle(f.relativePath)}>
+              <img
+                src={`/api/bb/bb/photo-file?jobRoot=${encodeURIComponent(jobRoot)}&path=${encodeURIComponent(f.relativePath)}`}
+                alt={f.relativePath}
+                loading="lazy"
+              />
+              <div className="caption">{f.relativePath.split("/").pop()}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {filtered.length > PHOTOS_PER_PAGE &&
+        (showAll ? (
+          <div className="photo-pagination">
+            <span className="photo-page-label">Showing all {filtered.length} photos.</span>
+            <button
+              className="photo-page-btn"
+              onClick={() => {
+                setShowAll(false);
+                setPage(0);
+              }}
+            >
+              Paginate instead
+            </button>
+          </div>
+        ) : (
+          <div className="photo-pagination">
+            <button className="photo-page-btn" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={clampedPage === 0}>
+              ← Prev
+            </button>
+            <span className="photo-page-label">
+              Page {clampedPage + 1} of {totalPages}
+            </span>
+            <button className="photo-page-btn" onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={clampedPage >= totalPages - 1}>
+              Next →
+            </button>
+            <button className="photo-page-btn" onClick={() => setShowAll(true)}>
+              Show all {filtered.length}
+            </button>
+          </div>
+        ))}
     </div>
   );
 }
@@ -946,7 +947,7 @@ function AttachAsIs({ jobRoot, section, onRefresh }: { jobRoot: string; section:
 
   const choose = async (relativePath: string) => {
     setSelected(relativePath);
-    await fetch("/api/section-state", {
+    await fetch("/api/bb/bb/section-state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jobRoot, sectionId: section.id, patch: { selectedAttachmentPath: relativePath } }),
@@ -961,7 +962,7 @@ function AttachAsIs({ jobRoot, section, onRefresh }: { jobRoot: string; section:
     setExcluding(relativePath);
     try {
       const nextExcluded = [...(section.state.excludedMatchedPaths ?? []), relativePath];
-      const res = await fetch("/api/section-state", {
+      const res = await fetch("/api/bb/bb/section-state", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobRoot, sectionId: section.id, patch: { excludedMatchedPaths: nextExcluded } }),
@@ -977,7 +978,7 @@ function AttachAsIs({ jobRoot, section, onRefresh }: { jobRoot: string; section:
     }
   };
 
-  const fileUrl = (relativePath: string) => `/api/photo-file?jobRoot=${encodeURIComponent(jobRoot)}&path=${encodeURIComponent(relativePath)}`;
+  const fileUrl = (relativePath: string) => `/api/bb/bb/photo-file?jobRoot=${encodeURIComponent(jobRoot)}&path=${encodeURIComponent(relativePath)}`;
 
   if (candidates.length === 0) {
     return (
@@ -1080,145 +1081,6 @@ function AttachAsIs({ jobRoot, section, onRefresh }: { jobRoot: string; section:
   );
 }
 
-/** attach-multi sections -- a run of real completed exhibits (DS data-sheet prints, NDT forms, heat
- * treat charts, coating certs) appended verbatim behind the section's divider page. Every matched
- * PDF is listed: tick what belongs in the report, use the arrows to set print order, hover to
- * preview, ✕ to reject a wrong match for good. Spreadsheets with no PDF print beside them are
- * listed separately -- they exist, but can't be embedded until someone prints them to PDF. */
-function MultiAttach({ jobRoot, section, onRefresh }: { jobRoot: string; section: SectionWithState; onRefresh: () => void }) {
-  const candidates = section.matchedFiles;
-  // Keyed by section.id in SectionPanel, so this remounts fresh on a section switch or rescan.
-  const [selected, setSelected] = useState<string[]>(() => effectiveMultiSelection(section, section.state).map((f) => f.relativePath));
-  const [hovered, setHovered] = useState<string | undefined>(undefined);
-  const [excluding, setExcluding] = useState<string | undefined>(undefined);
-
-  const save = async (next: string[]) => {
-    setSelected(next);
-    await fetch("/api/section-state", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jobRoot, sectionId: section.id, patch: { selectedAttachmentPaths: next } }),
-    });
-  };
-  const toggle = (relativePath: string) => save(selected.includes(relativePath) ? selected.filter((p) => p !== relativePath) : [...selected, relativePath]);
-  const move = (relativePath: string, delta: -1 | 1) => {
-    const i = selected.indexOf(relativePath);
-    const j = i + delta;
-    if (i === -1 || j < 0 || j >= selected.length) return;
-    const next = [...selected];
-    [next[i], next[j]] = [next[j], next[i]];
-    save(next);
-  };
-  const exclude = async (relativePath: string) => {
-    setExcluding(relativePath);
-    try {
-      await fetch("/api/section-state", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jobRoot,
-          sectionId: section.id,
-          patch: {
-            excludedMatchedPaths: [...(section.state.excludedMatchedPaths ?? []), relativePath],
-            selectedAttachmentPaths: selected.filter((p) => p !== relativePath),
-          },
-        }),
-      });
-      onRefresh();
-    } finally {
-      setExcluding(undefined);
-    }
-  };
-
-  const fileUrl = (relativePath: string) => `/api/photo-file?jobRoot=${encodeURIComponent(jobRoot)}&path=${encodeURIComponent(relativePath)}`;
-  // Ticked files first, in print order, then everything else in scan order.
-  const ordered = [
-    ...selected.map((p) => candidates.find((f) => f.relativePath === p)).filter((f): f is JobFile => Boolean(f)),
-    ...candidates.filter((f) => !selected.includes(f.relativePath)),
-  ];
-  const previewTarget = hovered ?? selected[0];
-  // Every exhibit block takes hand-added files -- and a tech-rep-added section only has those.
-  const upload = (MANUAL_ATTACHMENT_SECTIONS.has(section.id) || section.custom) && (
-    <ManualAttachmentUpload
-      jobRoot={jobRoot}
-      sectionId={section.id}
-      manualAttachments={section.manualAttachments}
-      onUploaded={onRefresh}
-      hint={
-        section.custom
-          ? "Add this section's file(s) here — each one is ticked automatically and prints after the section's divider page."
-          : "Missing a sheet, or it lives somewhere else? Add it here — it's ticked automatically."
-      }
-    />
-  );
-
-  return (
-    <div>
-      {candidates.length > 0 && (
-        <>
-          <p className="file-count">
-            {selected.length} of {candidates.length} file(s) will print, in this order. Hover a file to preview it.
-          </p>
-          <div className="attachment-picker">
-            <div className="attachment-candidates">
-              {ordered.map((f) => {
-                const idx = selected.indexOf(f.relativePath);
-                const isOn = idx !== -1;
-                return (
-                  <div
-                    key={f.relativePath}
-                    className={`attachment-candidate multi-candidate ${isOn ? "selected" : "unselected"}`}
-                    onMouseEnter={() => setHovered(f.relativePath)}
-                    onMouseLeave={() => setHovered(undefined)}
-                  >
-                    <label className="multi-candidate-check">
-                      <input type="checkbox" checked={isOn} onChange={() => toggle(f.relativePath)} />
-                      <span className="multi-candidate-order">{isOn ? idx + 1 : ""}</span>
-                    </label>
-                    <span className="multi-candidate-name" title={f.relativePath}>
-                      {f.baseName}
-                      {f.ext !== ".pdf" && <span className="multi-candidate-badge">Excel — printed at generate</span>}
-                      <span className="multi-candidate-folder">{f.folderPath}</span>
-                    </span>
-                    <span className="multi-candidate-moves">
-                      <button type="button" className="secondary" disabled={!isOn || idx === 0} onClick={() => move(f.relativePath, -1)} title="Print earlier">
-                        ↑
-                      </button>
-                      <button type="button" className="secondary" disabled={!isOn || idx === selected.length - 1} onClick={() => move(f.relativePath, 1)} title="Print later">
-                        ↓
-                      </button>
-                    </span>
-                    <button
-                      type="button"
-                      className="attachment-candidate-remove"
-                      disabled={excluding === f.relativePath}
-                      onClick={() => exclude(f.relativePath)}
-                      title={`Not this section's file — stop matching "${f.baseName}" here`}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-            {previewTarget &&
-              (/\.pdf$/i.test(previewTarget) ? (
-                <div className="attachment-preview">
-                  <iframe key={previewTarget} src={fileUrl(previewTarget)} title={previewTarget} />
-                </div>
-              ) : (
-                <p className="section-reason">
-                  No preview for Excel files — this one is printed to PDF through Excel when the report is generated (open it in Excel to check it).
-                </p>
-              ))}
-          </div>
-        </>
-      )}
-      {upload}
-    </div>
-  );
-}
-
 function CoverEditor({
   jobRoot,
   section,
@@ -1262,7 +1124,7 @@ function CoverEditor({
     setBusy(true);
     try {
       const patch = { fields: values, customFields, fieldOrder: rowOrder };
-      await fetch("/api/section-state", {
+      await fetch("/api/bb/bb/section-state", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobRoot, sectionId: section.id, patch }),
@@ -1365,7 +1227,7 @@ function CoverEditor({
                 return (
                   <tr key={key} {...rowProps}>
                     {dragHandle}
-                    <th style={{ width: 170, textAlign: "left" }}>{fixed.uiLabel ?? section.state.fieldLabels?.[key] ?? fixed.label}</th>
+                    <th style={{ width: 170, textAlign: "left" }}>{fixed.label}</th>
                     <td>
                       <input
                         type="text"
@@ -1421,23 +1283,14 @@ function SectionPanel({
   onRefresh,
   onReviewed,
   onToggleExcluded,
-  onRenameCustom,
-  onDeleteCustom,
   patchSectionState,
-  reportType,
-  variant,
 }: {
   jobRoot: string;
   section: SectionWithState;
   metadata: JobScanResult["metadata"];
-  reportType: ReportTypeId;
-  variant: JobScanResult["variant"];
   onRefresh: () => void;
   onReviewed: (acknowledged: boolean) => void;
   onToggleExcluded: (excluded: boolean) => void;
-  /** Tech-rep-added sections only (section.custom). */
-  onRenameCustom: (title: string) => void;
-  onDeleteCustom: () => void;
   patchSectionState: (sectionId: string, patch: Partial<SectionState>) => void;
 }) {
   const omitted = omittedReason(section);
@@ -1447,7 +1300,7 @@ function SectionPanel({
   // doesn't change what's found on disk, just whether generateReport.ts uses it (see
   // renderReportHtml.ts's own excludePrintPdf check) -- toggled back on the same way.
   const setExcludePrintPdf = async (excluded: boolean) => {
-    await fetch("/api/section-state", {
+    await fetch("/api/bb/bb/section-state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jobRoot, sectionId: section.id, patch: { excludePrintPdf: excluded } }),
@@ -1455,57 +1308,11 @@ function SectionPanel({
     onRefresh();
   };
   const printPdfExcluded = Boolean(section.printPdfFile) && Boolean(section.state.excludePrintPdf);
-  // Inline rename box / delete confirmation (not the browser's prompt()/confirm()).
-  const [renaming, setRenaming] = useState(false);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
         <h2 style={{ margin: 0 }}>{section.title}</h2>
-        {(section.custom || section.divider) && (
-          <span className="custom-section-actions">
-            {renaming ? (
-              <InlineTitleForm
-                initial={section.title}
-                placeholder="Title on its divider page / slide"
-                submitLabel="Save"
-                onSubmit={(title) => {
-                  setRenaming(false);
-                  onRenameCustom(title);
-                }}
-                onCancel={() => setRenaming(false)}
-              />
-            ) : confirmingDelete ? (
-              <span className="inline-confirm">
-                Delete this section? Attached files stay in the job folder.
-                <button
-                  type="button"
-                  onClick={() => {
-                    setConfirmingDelete(false);
-                    onDeleteCustom();
-                  }}
-                >
-                  Delete
-                </button>
-                <button type="button" className="secondary" onClick={() => setConfirmingDelete(false)}>
-                  Cancel
-                </button>
-              </span>
-            ) : (
-              <>
-                <button type="button" className="secondary" title="Change the title printed on this section's divider page / slide" onClick={() => setRenaming(true)}>
-                  Rename
-                </button>
-                {section.custom && (
-                  <button type="button" className="secondary" onClick={() => setConfirmingDelete(true)}>
-                    Delete section
-                  </button>
-                )}
-              </>
-            )}
-          </span>
-        )}
         <button className={section.state.acknowledged ? "secondary" : ""} onClick={() => onReviewed(!section.state.acknowledged)}>
           {section.state.acknowledged ? "✓ Reviewed" : "Tech Rep Reviewed"}
         </button>
@@ -1554,20 +1361,18 @@ function SectionPanel({
           clicked to a different section and back. */}
       {section.generation === "llm-narrative" && (
         <NarrativeEditor
-          key={`${section.id}-${section.state.lastGeneratedAt ?? ""}-${variant}`}
+          key={`${section.id}-${section.state.lastGeneratedAt ?? ""}`}
           jobRoot={jobRoot}
           section={section}
           onUpdated={onRefresh}
-          reportType={reportType}
-          fsText={variant === "fs" && (section.id === "repairRecommendations" || section.id === "repairSummary")}
+          turbineModel={metadata.turbineModel}
         />
       )}
       {section.generation === "table-from-source" && (
         <TablePreview key={section.id} jobRoot={jobRoot} section={section} onRefresh={onRefresh} patchSectionState={patchSectionState} />
       )}
-      {section.generation === "llm-vision-select" && <PhotoSetEditor key={section.id} jobRoot={jobRoot} section={section} reportType={reportType} />}
+      {section.generation === "llm-vision-select" && <PhotoSetEditor key={section.id} jobRoot={jobRoot} section={section} />}
       {section.generation === "attach-as-is" && <AttachAsIs key={section.id} jobRoot={jobRoot} section={section} onRefresh={onRefresh} />}
-      {section.generation === "attach-multi" && <MultiAttach key={section.id} jobRoot={jobRoot} section={section} onRefresh={onRefresh} />}
       {section.generation === "template" && (
         <CoverEditor key={section.id} jobRoot={jobRoot} section={section} metadata={metadata} patchSectionState={patchSectionState} />
       )}
@@ -1581,10 +1386,7 @@ export default function Home() {
   const [scan, setScan] = useState<ScanResponse | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  // Which export is running (drives the overlay text); null when idle.
-  const [generating, setGenerating] = useState<null | "pdf">(null);
-  // The sidebar's inline "+ Add section" title box (see InlineTitleForm).
-  const [addingSection, setAddingSection] = useState(false);
+  const [generating, setGenerating] = useState(false);
   // Which sidebar row is being dragged / currently dragged over, purely for the drag-and-drop
   // visual feedback below (dimming the dragged row, highlighting the drop target) -- the actual
   // reorder itself only happens on drop, via reorderSections.
@@ -1594,7 +1396,7 @@ export default function Home() {
   const runScan = async (root: string) => {
     setLoading(true);
     try {
-      const res = await fetch("/api/scan", {
+      const res = await fetch("/api/bb/bb/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobRoot: root, reportType }),
@@ -1649,10 +1451,10 @@ export default function Home() {
       const byId = new Map(prev.sections.map((s) => [s.id, s]));
       return { ...prev, sections: ids.map((id) => byId.get(id)!), sectionOrder: ids };
     });
-    fetch("/api/section-order", {
+    fetch("/api/bb/bb/section-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jobRoot, order: ids, reportType }),
+      body: JSON.stringify({ jobRoot, order: ids }),
     });
   };
 
@@ -1664,7 +1466,7 @@ export default function Home() {
   const setExcludeFromReport = async (sectionId: string, excluded: boolean) => {
     if (!jobRoot) return;
     patchSectionState(sectionId, { excludeFromReport: excluded });
-    await fetch("/api/section-state", {
+    await fetch("/api/bb/bb/section-state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jobRoot, sectionId, patch: { excludeFromReport: excluded } }),
@@ -1679,124 +1481,45 @@ export default function Home() {
       const next = scan.sections[idx + 1];
       if (next) setSelectedId(next.id);
     }
-    await fetch("/api/section-state", {
+    await fetch("/api/bb/bb/section-state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jobRoot, sectionId, patch: { acknowledged } }),
     });
   };
 
-  /** Saves a response body as a download -- appended to the DOM and the object URL kept alive for
-   * a beat, since revoking immediately raced the browser's own read of a large blob (a truncated
-   * "saved" PDF that wouldn't open). */
-  const saveDownload = async (res: Response, fallbackName: string) => {
-    const name = decodeURIComponent(res.headers.get("X-File-Name") ?? "") || fallbackName;
-    const url = URL.createObjectURL(await res.blob());
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 30_000);
-  };
-
-  const headerList = (res: Response, header: string): string[] => {
-    try {
-      return JSON.parse(decodeURIComponent(res.headers.get(header) ?? "%5B%5D"));
-    } catch {
-      return [];
-    }
-  };
-
-  /** Exhibits that couldn't be embedded (an Excel-only sheet with no Excel install to print it, a
-   * met report saved as a photo, ...) -- the PDF still downloads, but say what's missing. */
-  const reportOmissions = (res: Response) => {
-    const skipped = headerList(res, "X-Skipped-Attachments");
-    const notes: string[] = [];
-    if (skipped.length > 0) notes.push(`These files couldn't be included:\n${skipped.join("\n")}\n\nPrint them to PDF in the same folder and try again.`);
-    if (notes.length > 0) alert(`The PDF was built, but:\n\n${notes.join("\n\n")}`);
-  };
-
-  const failMessage = async (res: Response, fallback: string) => {
-    try {
-      return (await res.json()).error ?? fallback;
-    } catch {
-      return fallback;
-    }
-  };
-
-  // A tech-rep-added section: a title of their choosing over files they attach by hand, printed
-  // like every other exhibit block (divider page / slide, then the files). Applied to `scan` right
-  // here rather than via a full rescan -- adding a section shouldn't cost a 30-second folder walk;
-  // the rescan happens anyway once a file is attached to it.
-  const customSectionAction = async (action: "add" | "rename" | "delete" | "retitle", id?: string, titleIn?: string) => {
-    if (!jobRoot || !scan) return;
-    const title = titleIn;
-    if (action === "add" && !title?.trim()) return;
-    try {
-      const res = await fetch("/api/custom-section", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobRoot, reportType, action, id, title }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      if (action === "add" && data.section) {
-        const added: SectionWithState = {
-          id: data.section.id,
-          title: data.section.title,
-          generation: "attach-multi",
-          automationConfidence: "high",
-          status: "missing",
-          statusReason: "Add this section's file(s) below — PDFs go in as-is, Excel files are printed through Excel.",
-          matchedFiles: [],
-          manualAttachments: [],
-          defaultSelectedPaths: [],
-          divider: true,
-          custom: true,
-          state: {},
-        };
-        setScan((prev) => (prev ? { ...prev, sections: [...prev.sections, added] } : prev));
-        setSelectedId(added.id);
-      } else if ((action === "rename" || action === "retitle") && data.section) {
-        setScan((prev) => (prev ? { ...prev, sections: prev.sections.map((s) => (s.id === id ? { ...s, title: data.section.title } : s)) } : prev));
-      } else if (action === "delete") {
-        setScan((prev) => (prev ? { ...prev, sections: prev.sections.filter((s) => s.id !== id) } : prev));
-        setSelectedId((prev) => (prev === id ? (scan.sections[0]?.id ?? null) : prev));
-      }
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Couldn't update the section");
-    }
-  };
-
-  // Which sections the FS version prints differently: FS copies of its sheets / the F-306-01 NDT
-  // form, or a shorter FS text for the repair lists.
-  const fsChanges = (s: SectionWithState) =>
-    Boolean(s.fsDiffers) || ((s.id === "repairRecommendations" || s.id === "repairSummary") && Boolean(s.state.compactContent?.trim()));
-  const fsChangedTitles = scan ? scan.sections.filter((s) => !isExcluded(s, s.state) && fsChanges(s as SectionWithState)).map((s) => s.title) : [];
-
-  // Calpine jobs get two copies of each report: the standard one and the shorter Fleet Service (FS)
-  // one -- FS copies of the sheets and the FS repair lists. Rescans so the panel shows that version.
-  const setVariant = async (variant: JobScanResult["variant"]) => {
-    if (!jobRoot || scan?.variant === variant) return;
-    await fetch("/api/report-variant", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jobRoot, reportType, variant }) });
-    await runScan(jobRoot);
-  };
-
-  // The report PDF, built straight from the app.
   const generateReport = async () => {
     if (!jobRoot) return;
-    setGenerating("pdf");
+    setGenerating(true);
     try {
-      const res = await fetch("/api/generate-pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jobRoot, reportType }) });
-      if (!res.ok) throw new Error(await failMessage(res, "PDF generation failed"));
-      await saveDownload(res, `${scan?.metadata.jobNumber ?? "report"} ${reportType === "final" ? "Repair" : "IA"} Report${scan?.variant === "fs" ? " FS" : ""}.pdf`);
-      reportOmissions(res);
+      const res = await fetch("/api/bb/bb/generate-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobRoot, reportType }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${scan?.metadata.jobNumber ?? "report"}-${reportType === "final" ? "Final" : "IA"}-Report.pdf`;
+      // Appended to the DOM (some browsers won't fire the download from a detached anchor) and the
+      // object URL is kept alive for a beat after the click instead of revoked immediately -- a
+      // Final Report's PDF runs several MB (all those inline exhibits/photos), and revoking
+      // synchronously raced the browser's own read of the blob on exactly that larger file, so it
+      // reported a "saved" download that was actually truncated and wouldn't open. The I&A Report's
+      // smaller PDF rarely hit the race, which is why this only showed up on Final Reports.
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
     } catch (e) {
       alert(e instanceof Error ? e.message : "PDF generation failed");
     } finally {
-      setGenerating(null);
+      setGenerating(false);
     }
   };
 
@@ -1816,7 +1539,10 @@ export default function Home() {
       <div className="folder-picker">
         <div className="app-logo">
           <AppLogoMark animated={loading} />
-          <AppWordmark />
+          <div className="app-wordmark">
+            <span className="app-wordmark-eyebrow">Buckets &amp; Blades</span>
+            <h1>Report Builder</h1>
+          </div>
         </div>
         <div className="app-logo-bar" />
         <p className="folder-picker-subtitle">{loading ? "Analyzing job files and building the initial draft…" : "Something went wrong loading this job."}</p>
@@ -1856,8 +1582,7 @@ export default function Home() {
         </button>
         <span className="job-path">{jobRoot}</span>
         <span className="file-count">
-          Job #{scan.metadata.jobNumber} · {scan.metadata.customer} · {scan.metadata.part}
-          {scan.metadata.quantity ? ` · Qty ${scan.metadata.quantity}` : ""}
+          Job #{scan.metadata.jobNumber} · {scan.metadata.customer} · {scan.metadata.part} · Qty {scan.metadata.quantity}
         </span>
         <button disabled={loading} className="secondary" onClick={() => runScan(jobRoot)}>
           {loading ? "Scanning..." : "Rescan"}
@@ -1909,58 +1634,22 @@ export default function Home() {
                 <button type="button" className="section-item-select" onClick={() => setSelectedId(s.id)}>
                   <div className="title-row">
                     <span>{s.title}</span>
-                  </div>
-                  {/* Badge on its own line under the title, so every row's badge sits in the same
-                      spot however long the title runs ("Repair Recommendations" used to push it
-                      into the ✕). */}
-                  <div className="section-meta-row">
-                    {/* Just the level ("high") -- the full wording is in the tooltip -- so the row
-                        always leaves room for the status badge before the ✕. */}
-                    <span className="confidence-tag" title={`Automation confidence: ${s.automationConfidence}`}>
-                      {s.automationConfidence}
-                      {scan.fsAvailable && fsChanges(s) && (
-                        <span className="fs-tag" title="Prints differently in the FS (Fleet Service) version">
-                          FS
-                        </span>
-                      )}
-                    </span>
                     <StatusBadge status={s.status} acknowledged={s.state.acknowledged} omitted={omittedReason(s)} />
                   </div>
+                  <div className="confidence-tag">{s.automationConfidence} confidence</div>
                 </button>
-                {s.id === "cover" ? (
-                  // Same width as the ✕ on every other row, so the cover's badge lines up with theirs.
-                  <span className="section-remove-btn" aria-hidden="true" style={{ visibility: "hidden" }}>
-                    ✕
-                  </span>
-                ) : (
+                {s.id !== "cover" && (
                   <button
                     type="button"
                     className="section-remove-btn"
-                    title={isExcluded(s, s.state) ? `Add "${s.title}" back to the report` : `Leave "${s.title}" out of the report`}
-                    onClick={() => setExcludeFromReport(s.id, !isExcluded(s, s.state))}
+                    title={s.state.excludeFromReport ? `Add "${s.title}" back to the report` : `Leave "${s.title}" out of the report`}
+                    onClick={() => setExcludeFromReport(s.id, !s.state.excludeFromReport)}
                   >
-                    {isExcluded(s, s.state) ? "↺" : "✕"}
+                    {s.state.excludeFromReport ? "↺" : "✕"}
                   </button>
                 )}
               </div>
             ))}
-            {addingSection ? (
-              <div className="add-section-form">
-                <InlineTitleForm
-                  placeholder='Section title, e.g. "Eddy Current Map"'
-                  submitLabel="Add"
-                  onSubmit={(title) => {
-                    setAddingSection(false);
-                    customSectionAction("add", undefined, title);
-                  }}
-                  onCancel={() => setAddingSection(false)}
-                />
-              </div>
-            ) : (
-              <button type="button" className="add-section-btn" onClick={() => setAddingSection(true)}>
-                + Add section
-              </button>
-            )}
             <div className="sidebar-logo-spacer" aria-hidden="true">
               <img src="/apg-logo-transparent.png" alt="" className="sidebar-logo-img" />
             </div>
@@ -1968,40 +1657,20 @@ export default function Home() {
         </nav>
         <main className="main-panel">
           <SectionPanel
-            // Remounted on a Standard / FS switch too, so ticks and text are that version's.
-            key={`${selectedSection.id}-${scan.variant}`}
             jobRoot={jobRoot}
             section={selectedSection}
             metadata={scan.metadata}
             onRefresh={() => runScan(jobRoot)}
             onReviewed={(acknowledged) => markReviewed(selectedSection.id, acknowledged)}
             onToggleExcluded={(excluded) => setExcludeFromReport(selectedSection.id, excluded)}
-            onRenameCustom={(title) => customSectionAction(selectedSection.custom ? "rename" : "retitle", selectedSection.id, title)}
-            onDeleteCustom={() => customSectionAction("delete", selectedSection.id)}
             patchSectionState={patchSectionState}
-            reportType={reportType}
-            variant={scan.variant}
           />
         </main>
       </div>
       <footer className="app-header" style={{ justifyContent: "flex-end" }}>
         {!allAddressed && <span className="confidence-note">Some sections still need attention.</span>}
-        {scan.fsAvailable && (
-          <span
-            className="variant-switch"
-            title={`Calpine reports go out in two versions: the standard report and the shorter Fleet Service (FS) copy. Sections that differ (tagged FS in the list): ${fsChangedTitles.join(", ") || "none on this job"}. Everything else is identical.`}
-          >
-            Version:
-            <button type="button" className={scan.variant === "standard" ? "active" : ""} disabled={generating !== null} onClick={() => setVariant("standard")}>
-              Standard
-            </button>
-            <button type="button" className={scan.variant === "fs" ? "active" : ""} disabled={generating !== null} onClick={() => setVariant("fs")}>
-              FS (Fleet Service)
-            </button>
-          </span>
-        )}
-        <button className="generate-report" disabled={generating !== null} onClick={generateReport} title="Build the finished report PDF, every section and exhibit in order">
-          Generate PDF
+        <button className="generate-report" disabled={generating} onClick={generateReport}>
+          {generating ? "Generating..." : "Generate Report"}
         </button>
       </footer>
       {/* Same fill-loop mark as the initial job-scan screen, in an overlay rather than a full
@@ -2013,7 +1682,7 @@ export default function Home() {
           <div className="generating-overlay-card">
             <AppLogoMark animated />
             <p className="generating-overlay-text">Generating report…</p>
-            <RotatingHint key={generating} messages={GENERATING_QUIPS[generating]} />
+            <p className="generating-overlay-hint">Assembling every section and exhibit into the final PDF.</p>
           </div>
         </div>
       )}

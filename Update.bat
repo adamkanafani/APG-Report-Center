@@ -1,7 +1,7 @@
 @echo off
-title Vanes and Nozzles Report Builder - Update
+title APG Report Center - Update
 echo ============================================
-echo   Vanes and Nozzles Report Builder - Update
+echo   APG Report Center - Update
 echo ============================================
 echo.
 echo Downloading the latest version...

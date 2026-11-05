@@ -1,4 +1,4 @@
-# Vanes & Nozzles Report Builder — Setup Guide
+# APG Report Center — Setup Guide
 
 This app runs on your own computer and reads your job folders directly, so
 each tech rep needs their own copy running locally. It does **not** need an
@@ -29,10 +29,10 @@ Documents — right-click inside it, choose **"Open in Terminal"** (or
 "Git Bash Here" if you see that option), and run:
 
 ```
-git clone https://github.com/adamkanafani/VN-Report-App.git
+git clone https://github.com/adamkanafani/APG-Report-Center.git
 ```
 
-This creates a new folder called `VN-Report-App`. Open that folder.
+This creates a new folder called `APG-Report-Center`. Open that folder.
 
 ### 4. Run setup
 
@@ -43,14 +43,23 @@ done — press any key to close the window.
 
 ## Using the app day-to-day
 
-Double-click **`Start Report Builder.bat`**. Two things will happen:
+Double-click **`Start Report Center.bat`**. Two things will happen:
 
-- A window titled **"Vanes & Nozzles Report Builder - Server"** opens. **Leave this
+- A window titled **"APG Report Center - Server"** opens. **Leave this
   open** while you work (you can minimize it) — closing it shuts the app
   down. Close it when you're done for the day.
 - Your web browser opens the app automatically a few seconds later.
 
-That's it — pick your job folder like normal and work through the report.
+Pick your line of business (Parts, Repair, Inspection, …), then the report
+builder for your part, then your job folder, and work through the report.
+
+## Coming from the Vanes & Nozzles or Tech Rep Report Builder
+
+Both builders now live inside this app (Parts → Vanes & Nozzles, Parts →
+Buckets & Blades). Reports you'd already started reviewing in either old app
+show up here as they were -- the saved progress lives outside the app folders.
+Close the old app before starting this one; once you're working here you can
+delete the old folder.
 
 ## Getting updates
 
@@ -67,10 +76,6 @@ your saved progress lives outside this folder and is untouched.
 - **Your job folders** — the app just needs to be able to browse to
   wherever your job folders already live (network drive, OneDrive, etc.),
   same as you'd browse to them in File Explorer.
-- **Microsoft PowerPoint** — the usual way to finish a report is "1. Download
-  PowerPoint", edit the deck, then "2. Build PDF from edited PowerPoint…",
-  which uses your installed PowerPoint to export the deck before adding the
-  forms. ("Quick PDF" works without PowerPoint.)
 - **Microsoft Excel** — some DS sheets / NDT forms only exist as Excel files
   (no PDF print in the job folder). With Excel installed the app prints them
   to PDF for you when the report is built; without it, they're listed as

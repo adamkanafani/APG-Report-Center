@@ -1,0 +1,50 @@
+/* Home screens: the line-of-business picker and each line's builder picker. */
+
+/* body is a flex column and .folder-picker centers itself with auto margins, which would shrink it
+   to its content; the tile grid needs the full width to lay out side by side. */
+.home {
+  width: 100%;
+  box-sizing: border-box;
+  max-width: 760px;
+}
+
+.home .lob-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+  position: relative;
+  z-index: 1;
+}
+
+.home .lob-tile {
+  text-decoration: none;
+  min-height: 92px;
+  justify-content: center;
+}
+
+.home .lob-tile .report-type-option-label {
+  font-size: 19px;
+}
+
+.home .lob-tile.soon {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.home .lob-tile.soon:hover {
+  border-color: #d5e1f2;
+  background: rgba(255, 255, 255, 0.85);
+  color: #0b3d91;
+}
+
+.home .lob-tile.soon:hover .report-type-option-description {
+  color: #33507a;
+}
+
+.home .lob-note {
+  margin-top: 16px;
+  font-size: 13px;
+  color: #33507a;
+  position: relative;
+  z-index: 1;
+}

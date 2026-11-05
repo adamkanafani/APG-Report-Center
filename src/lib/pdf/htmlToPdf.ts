@@ -1,4 +1,4 @@
-import puppeteer, { type Browser } from "puppeteer-core";
+import puppeteer, { type Browser, type PDFOptions } from "puppeteer-core";
 import { existsSync, promises as fs } from "fs";
 import os from "os";
 import path from "path";
@@ -77,7 +77,9 @@ function scheduleIdleClose() {
   }, IDLE_CLOSE_MS);
 }
 
-export async function htmlToPdf(html: string): Promise<Buffer> {
+/** Prints HTML to PDF on the shared browser. Every builder in the app goes through here (the
+ * Buckets & Blades builder with its own Letter page settings), so they share the one fast browser. */
+export async function renderPdf(html: string, options: PDFOptions): Promise<Buffer> {
   inFlight++;
   if (idleTimer) clearTimeout(idleTimer);
   try {
@@ -85,16 +87,7 @@ export async function htmlToPdf(html: string): Promise<Buffer> {
     const page = await browser.newPage();
     try {
       await page.setContent(html, { waitUntil: "load" });
-      const pdfBuffer = await page.pdf({
-        // The tech reps' own report pages are 7.5 x 10in (their PowerPoint slide size) edge to edge;
-        // only the exhibit sheets copied in are Letter. Same here, so a page of ours sits beside a
-        // page of theirs at the same scale (renderReportHtml.ts lays out in pt on this page).
-        width: "7.5in",
-        height: "10in",
-        printBackground: true,
-        margin: { top: "0", bottom: "0", left: "0", right: "0" },
-      });
-      return Buffer.from(pdfBuffer);
+      return Buffer.from(await page.pdf(options));
     } finally {
       await page.close().catch(() => {});
     }
@@ -102,4 +95,16 @@ export async function htmlToPdf(html: string): Promise<Buffer> {
     inFlight--;
     scheduleIdleClose();
   }
+}
+
+export function htmlToPdf(html: string): Promise<Buffer> {
+  return renderPdf(html, {
+    // The tech reps' own report pages are 7.5 x 10in (their PowerPoint slide size) edge to edge;
+    // only the exhibit sheets copied in are Letter. Same here, so a page of ours sits beside a
+    // page of theirs at the same scale (renderReportHtml.ts lays out in pt on this page).
+    width: "7.5in",
+    height: "10in",
+    printBackground: true,
+    margin: { top: "0", bottom: "0", left: "0", right: "0" },
+  });
 }

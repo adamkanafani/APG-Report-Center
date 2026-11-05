@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+// The home screens share the builders' look (backdrop, logo, option buttons).
+import "../(vanes-nozzles)/globals.css";
+import "./home.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,11 +15,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "V&N Report Builder",
-  description: "Draft and review Allied Power Group Vanes & Nozzles reports from a job folder.",
+  title: "APG Report Center",
+  description: "Allied Power Group report builders for every line of business.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function HomeLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body>{children}</body>

@@ -1,6 +1,6 @@
 @echo off
-title Vanes and Nozzles Report Builder - Launcher
-echo Starting Vanes and Nozzles Report Builder...
+title APG Report Center - Launcher
+echo Starting APG Report Center...
 echo.
 echo A new window will open running the app - leave THAT window open while you
 echo work (you can minimize it). Your browser will open automatically in a
@@ -13,7 +13,7 @@ if not exist ".next" (
   pause
   exit /b 1
 )
-start "Vanes and Nozzles Report Builder - Server (leave this open)" cmd /k "npm run start -- -p 3001"
+start "APG Report Center - Server (leave this open)" cmd /k "npm run start -- -p 3002"
 timeout /t 5 /nobreak >nul
-start "" http://localhost:3001
+start "" http://localhost:3002
 exit

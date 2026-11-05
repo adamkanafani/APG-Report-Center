@@ -1,7 +1,7 @@
 @echo off
-title Vanes and Nozzles Report Builder - Setup
+title APG Report Center - Setup
 echo ============================================
-echo   Vanes and Nozzles Report Builder - First-Time Setup
+echo   APG Report Center - First-Time Setup
 echo ============================================
 echo.
 echo Checking for Node.js...
@@ -40,6 +40,6 @@ if errorlevel 1 (
 echo.
 echo ============================================
 echo   Setup complete!
-echo   From now on, just double-click "Start Report Builder.bat" to run the app.
+echo   From now on, just double-click "Start Report Center.bat" to run the app.
 echo ============================================
 pause

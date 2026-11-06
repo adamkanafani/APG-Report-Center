@@ -630,6 +630,8 @@ interface TemplatesResponse {
   uploaded: TemplateOption[];
   unit: string | null;
   matchedCount: number;
+  /** The template folder in use on this computer. */
+  dir?: string;
   error?: string;
 }
 
@@ -646,6 +648,7 @@ function TemplateStep({ rawPath, onChosen, onBack }: { rawPath: string | null; o
   const [templatesError, setTemplatesError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [browsing, setBrowsing] = useState(false);
+  const [choosingFolder, setChoosingFolder] = useState(false);
   // Same as Home's rawBrowseDir -- remembers where "Browse for a different file..." was left,
   // so toggling back to the curated list and back to browsing again resumes there.
   const [browseDir, setBrowseDir] = useState<string | null>(null);
@@ -696,6 +699,36 @@ function TemplateStep({ rawPath, onChosen, onBack }: { rawPath: string | null; o
     }
   }
 
+  async function chooseFolder(dir: string) {
+    setTemplatesError(null);
+    try {
+      const res = await fetch("/api/ats-borescope/templates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dir }) });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Couldn't use that folder");
+      setChoosingFolder(false);
+      setResult(null);
+      refresh();
+    } catch (err) {
+      setChoosingFolder(false);
+      setTemplatesError(err instanceof Error ? err.message : "Couldn't use that folder");
+    }
+  }
+
+  if (choosingFolder) {
+    return (
+      <FilePicker
+        title="Choose the templates folder"
+        instructions={'Open the folder that holds the blank ATS templates (usually "ATS Cover Page Templates", on OneDrive or your job drive), then click "Use this folder". The app remembers it on this computer.'}
+        extensions="docx"
+        onChosen={() => {}}
+        onFolderChosen={chooseFolder}
+        onBack={() => setChoosingFolder(false)}
+        initialDir={browseDir}
+        onDirChange={setBrowseDir}
+      />
+    );
+  }
+
   if (browsing) {
     return (
       <FilePicker
@@ -723,6 +756,12 @@ function TemplateStep({ rawPath, onChosen, onBack }: { rawPath: string | null; o
           </button>
         </div>
         {templatesError && <p className="folder-picker-error">{templatesError}</p>}
+        <p className="folder-picker-subtitle">
+          {result?.dir ? <>Templates from <span className="job-path">{result.dir}</span> </> : null}
+          <button className="secondary" onClick={() => setChoosingFolder(true)} style={{ padding: "2px 10px", fontSize: 12 }}>
+            Choose templates folder...
+          </button>
+        </p>
         {result && unitType && !showAll && (
           <p className="folder-picker-subtitle">
             {result.templates.length > 0
@@ -788,6 +827,7 @@ function TemplateStep({ rawPath, onChosen, onBack }: { rawPath: string | null; o
 
 function FilePicker({
   showHome,
+  onFolderChosen,
   title,
   instructions,
   extensions,
@@ -799,6 +839,8 @@ function FilePicker({
 }: {
   /** First screen only: a link back to the Report Center home screen. */
   showHome?: boolean;
+  /** Picking a folder rather than a file: "Use this folder" hands back the folder itself. */
+  onFolderChosen?: (dir: string) => void;
   title: string;
   instructions: string;
   extensions: string;
@@ -921,6 +963,9 @@ function FilePicker({
           )}
           {enableUseThisFolder && data && !data.isDriveList && data.dir && (
             <button onClick={useThisFolder}>Use this folder</button>
+          )}
+          {onFolderChosen && data && !data.isDriveList && data.dir && (
+            <button onClick={() => onFolderChosen(data.dir as string)}>Use this folder</button>
           )}
         </div>
         {error && <p className="folder-picker-error">{error}</p>}

@@ -10,18 +10,49 @@ import { listUploadedTemplates } from "@/atsBorescope/lib/docx/uploadedTemplates
  *  growing), maintained outside this project so new templates show up here without a deploy.
  *  See templateFamilies.ts for which of these the assembler actually knows how to fill in;
  *  picking one it doesn't recognize fails clearly at scan time rather than guessing wrong. */
-// Found under whoever is signed in, not one person's fixed path: the folder is synced (or added as a
-// shortcut) from the "Strategy - Files" SharePoint library into each person's
-// "OneDrive - Allied Power Group" folder. ATS_TEMPLATES_DIR in .env.local overrides the search.
+// Where it is differs per computer, so it's looked for in order:
+//  1. the folder picked on this computer with "Choose templates folder..." (saved in SETTINGS_FILE),
+//  2. ATS_TEMPLATES_DIR in .env.local,
+//  3. the signed-in person's OneDrive (synced or shortcut from Strategy - Files > ATS Reporting),
+//  4. any drive plugged in or mapped (D: to Z:): the field techs carry their job files and
+//     templates on a physical drive.
 const TEMPLATES_FOLDER = "ATS Cover Page Templates";
+const SETTINGS_FILE = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "APGReportCenter", "ats-borescope.json");
 
 async function isDir(p: string) {
   return fs.stat(p).then((st) => st.isDirectory()).catch(() => false);
 }
 
+async function savedTemplatesDir(): Promise<string | null> {
+  const saved = await fs.readFile(SETTINGS_FILE, "utf8").then((t) => JSON.parse(t).templatesDir as string).catch(() => null);
+  return saved && (await isDir(saved)) ? saved : null;
+}
+
+/** The folder directly in `root`, or one level down (e.g. E:\ATS\ATS Cover Page Templates). One
+ * directory listing per folder, so even a big mapped drive is quick. */
+async function findUnder(root: string, depth: number): Promise<string | null> {
+  const entries = await fs.readdir(root, { withFileTypes: true }).catch(() => []);
+  const hit = entries.find((e) => e.isDirectory() && e.name.toLowerCase() === TEMPLATES_FOLDER.toLowerCase());
+  if (hit) return path.join(root, hit.name);
+  if (depth === 0) return null;
+  for (const e of entries.slice(0, 300)) {
+    if (!e.isDirectory() || e.name.startsWith("$") || e.name.startsWith(".")) continue;
+    const found = await findUnder(path.join(root, e.name), depth - 1);
+    if (found) return found;
+  }
+  return null;
+}
+
+async function remember(dir: string) {
+  await fs.mkdir(path.dirname(SETTINGS_FILE), { recursive: true });
+  await fs.writeFile(SETTINGS_FILE, JSON.stringify({ templatesDir: dir }, null, 2));
+}
+
 async function findTemplatesDir(): Promise<string | null> {
+  const saved = await savedTemplatesDir();
+  if (saved) return saved;
   const override = process.env.ATS_TEMPLATES_DIR?.trim();
-  if (override) return (await isDir(override)) ? override : null;
+  if (override && (await isDir(override))) return override;
   const home = os.homedir();
   for (const root of [path.join(home, "OneDrive - Allied Power Group"), home]) {
     // Usually <root>/Strategy - Files/ATS Reporting/ATS Cover Page Templates; any library or folder
@@ -36,12 +67,34 @@ async function findTemplatesDir(): Promise<string | null> {
       }
     }
   }
+  // Plugged-in and mapped drives, skipping C: (already covered above, and too big to walk).
+  for (const letter of "DEFGHIJKLMNOPQRSTUVWXYZ") {
+    const root = `${letter}:\\`;
+    if (!(await isDir(root))) continue;
+    const found = await findUnder(root, 1);
+    if (found) {
+      // Remembered, so the drives aren't searched again every time.
+      await remember(found).catch(() => {});
+      return found;
+    }
+  }
   return null;
 }
 
 const NOT_FOUND =
-  'Couldn\'t find ATS\'s "ATS Cover Page Templates" folder on this computer. In SharePoint, open Strategy - Files > ATS Reporting, ' +
-  'click "Add shortcut to My files" (or Sync), let OneDrive finish, then come back to this step. Or upload a blank template below.';
+  'Couldn\'t find the "ATS Cover Page Templates" folder on this computer. Click "Choose templates folder..." below and pick it ' +
+  "(on your OneDrive or the drive your job files are on). The app remembers it on this computer.";
+
+/** "Choose templates folder...": remembers the picked folder on this computer. */
+export async function POST(request: NextRequest) {
+  const body = await request.json().catch(() => ({}));
+  const dir = typeof body.dir === "string" ? body.dir.trim() : "";
+  if (!dir || !(await isDir(dir))) return NextResponse.json({ error: "That folder couldn't be opened." }, { status: 400 });
+  const docx = (await fs.readdir(dir)).filter((n) => n.toLowerCase().endsWith(".docx"));
+  if (docx.length === 0) return NextResponse.json({ error: "That folder has no Word templates (.docx) in it. Pick the folder the blank ATS templates are in." }, { status: 400 });
+  await remember(dir);
+  return NextResponse.json({ ok: true, dir });
+}
 
 interface TemplateOption {
   name: string;
@@ -100,7 +153,7 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
 
     if (!unit) {
-      return NextResponse.json({ templates: fullList, fullList, uploaded, unit: null, matchedCount: 0 });
+      return NextResponse.json({ templates: fullList, fullList, uploaded, unit: null, matchedCount: 0, dir: TEMPLATES_DIR });
     }
 
     const aliasGroup = unitAliasGroup(unit);
@@ -117,7 +170,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ templates: automated, fullList, uploaded, unit, matchedCount: unitMatches.length });
+    return NextResponse.json({ templates: automated, fullList, uploaded, unit, matchedCount: unitMatches.length, dir: TEMPLATES_DIR });
   } catch (err) {
     return NextResponse.json({ templates: [], fullList: [], uploaded, error: err instanceof Error ? err.message : "Failed to list templates" });
   }

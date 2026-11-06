@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0"
 title APG Report Center - Setup
 echo ============================================
 echo   APG Report Center - First-Time Setup
@@ -38,8 +39,12 @@ if errorlevel 1 (
   exit /b 1
 )
 echo.
+echo Adding the APG Report Center icon to your desktop...
+powershell -NoProfile -Command "$app = (Get-Location).Path; $lnk = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) 'APG Report Center.lnk')); $lnk.TargetPath = (Join-Path $app 'Start Report Center.bat'); $lnk.WorkingDirectory = $app; $lnk.IconLocation = (Join-Path $app 'src\app\favicon.ico'); $lnk.Description = 'APG Report Center'; $lnk.Save()"
+echo.
 echo ============================================
 echo   Setup complete!
-echo   From now on, just double-click "Start Report Center.bat" to run the app.
+echo   From now on, just double-click "APG Report Center" on your desktop
+echo   (or "Start Report Center.bat" in this folder) to run the app.
 echo ============================================
 pause

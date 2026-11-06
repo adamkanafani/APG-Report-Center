@@ -39,12 +39,14 @@ This creates a new folder called `APG-Report-Center`. Open that folder.
 
 Double-click **`Setup - Run This First.bat`**. A black window will open and
 do some work for a few minutes (this is normal, even if it looks like
-nothing is happening for a bit). When it says "Setup complete!", you're
+nothing is happening for a bit). It also puts an **APG Report Center**
+icon (the APG spire) on your desktop. When it says "Setup complete!", you're
 done — press any key to close the window.
 
 ## Using the app day-to-day
 
-Double-click **`Start Report Center.bat`**. Two things will happen:
+Double-click **APG Report Center** on your desktop (or
+**`Start Report Center.bat`** in the app folder). Two things will happen:
 
 - A window titled **"APG Report Center - Server"** opens. **Leave this
   open** while you work (you can minimize it) — closing it shuts the app

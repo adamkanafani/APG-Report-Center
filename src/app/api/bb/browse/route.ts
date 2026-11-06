@@ -188,6 +188,16 @@ async function searchFolders(root: string, query: string): Promise<{ results: Fo
   return { results, truncated };
 }
 
+/** The "OneDrive" starting point: the Strategy - Files library where job folders usually are, or --
+ * on a computer that doesn't sync that library -- the person's own OneDrive, then their user folder. */
+async function defaultStartDir(): Promise<string> {
+  const oneDrive = path.join(os.homedir(), "OneDrive - Allied Power Group");
+  for (const d of [path.join(oneDrive, "Strategy - Files"), oneDrive]) {
+    if (await fs.stat(d).then((st) => st.isDirectory()).catch(() => false)) return d;
+  }
+  return os.homedir();
+}
+
 export async function GET(request: NextRequest) {
   const dirParam = request.nextUrl.searchParams.get("dir");
   const query = request.nextUrl.searchParams.get("q")?.trim();
@@ -197,7 +207,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ dir: null, parent: null, folders, isDriveList: true });
   }
 
-  const dir = dirParam || path.join(os.homedir(), "OneDrive - Allied Power Group", "Strategy - Files");
+  const dir = dirParam || (await defaultStartDir());
 
   if (query) {
     try {

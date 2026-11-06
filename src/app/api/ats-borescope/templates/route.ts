@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
+import os from "os";
 import path from "path";
 import { loadDocx } from "@/atsBorescope/lib/docx/zip";
 import { detectTemplateFamily } from "@/atsBorescope/lib/docx/templateFamilies";
@@ -9,7 +10,38 @@ import { listUploadedTemplates } from "@/atsBorescope/lib/docx/uploadedTemplates
  *  growing), maintained outside this project so new templates show up here without a deploy.
  *  See templateFamilies.ts for which of these the assembler actually knows how to fill in;
  *  picking one it doesn't recognize fails clearly at scan time rather than guessing wrong. */
-const TEMPLATES_DIR = "C:\\Users\\akanafani\\OneDrive - Allied Power Group\\Strategy - Files\\ATS Reporting\\ATS Cover Page Templates";
+// Found under whoever is signed in, not one person's fixed path: the folder is synced (or added as a
+// shortcut) from the "Strategy - Files" SharePoint library into each person's
+// "OneDrive - Allied Power Group" folder. ATS_TEMPLATES_DIR in .env.local overrides the search.
+const TEMPLATES_FOLDER = "ATS Cover Page Templates";
+
+async function isDir(p: string) {
+  return fs.stat(p).then((st) => st.isDirectory()).catch(() => false);
+}
+
+async function findTemplatesDir(): Promise<string | null> {
+  const override = process.env.ATS_TEMPLATES_DIR?.trim();
+  if (override) return (await isDir(override)) ? override : null;
+  const home = os.homedir();
+  for (const root of [path.join(home, "OneDrive - Allied Power Group"), home]) {
+    // Usually <root>/Strategy - Files/ATS Reporting/ATS Cover Page Templates; any library or folder
+    // one level down also works, so a differently named shortcut is still found.
+    const direct = [path.join(root, "Strategy - Files", "ATS Reporting", TEMPLATES_FOLDER), path.join(root, "ATS Reporting", TEMPLATES_FOLDER), path.join(root, TEMPLATES_FOLDER)];
+    for (const d of direct) if (await isDir(d)) return d;
+    const level1 = await fs.readdir(root, { withFileTypes: true }).catch(() => []);
+    for (const a of level1) {
+      if (!a.isDirectory()) continue;
+      for (const d of [path.join(root, a.name, TEMPLATES_FOLDER), path.join(root, a.name, "ATS Reporting", TEMPLATES_FOLDER)]) {
+        if (await isDir(d)) return d;
+      }
+    }
+  }
+  return null;
+}
+
+const NOT_FOUND =
+  'Couldn\'t find ATS\'s "ATS Cover Page Templates" folder on this computer. In SharePoint, open Strategy - Files > ATS Reporting, ' +
+  'click "Add shortcut to My files" (or Sync), let OneDrive finish, then come back to this step. Or upload a blank template below.';
 
 interface TemplateOption {
   name: string;
@@ -54,6 +86,9 @@ export async function GET(request: NextRequest) {
   // two of them, and they're the tech rep's own explicit choice, not something to hide behind a
   // naming heuristic.
   const uploaded = await listUploadedTemplates();
+
+  const TEMPLATES_DIR = await findTemplatesDir();
+  if (!TEMPLATES_DIR) return NextResponse.json({ templates: [], fullList: [], uploaded, error: NOT_FOUND });
 
   try {
     const entries = await fs.readdir(TEMPLATES_DIR, { withFileTypes: true });

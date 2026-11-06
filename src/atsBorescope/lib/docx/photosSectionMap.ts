@@ -1,20 +1,8 @@
 /**
- * Every Photos/Observations subsection name used across all supported template families (see
- * templateFamilies.ts). A given family only ever uses a subset of these -- the standard 5 for
- * 7EA/ABB11N-shaped templates, plus Bearing Area/VIGV/Cold-vs-Hot-split for the wider 7FA/7HA/9FA
- * family. Kept as one union (rather than a type per family) since the client and the API routes
- * pass sections around generically without caring which family they came from.
+ * A Photos subsection, named exactly by its Heading2 text in the template -- e.g. "Compressor
+ * Section", "Combustion Section Hot Side", "Number One Bearing Area". Any text: the two GE
+ * families (templateFamilies.ts) use a fixed set, and every other model's template (501D5A, 501F,
+ * W251, Frame 6, LM6000, ...) brings its own headings, read straight from the template by
+ * genericFamily.ts.
  */
-export type PhotosSection =
-  | "Inlet Section"
-  | "Compressor Section"
-  | "Combustion Section"
-  | "Combustion Section Cold Side"
-  | "Combustion Section Hot Side"
-  | "Turbine Section"
-  | "Exhaust Section"
-  | "Number One Bearing Area"
-  | "Variable Inlet Guide Vanes"
-  | "R-17 Rotor Blade Dovetail Slot Trailing Edge"
-  | "Generator Turbine End"
-  | "Generator Exciter End";
+export type PhotosSection = string;

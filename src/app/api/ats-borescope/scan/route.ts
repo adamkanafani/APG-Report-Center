@@ -3,8 +3,8 @@ import { promises as fs } from "fs";
 import { loadDocx } from "@/atsBorescope/lib/docx/zip";
 import { parseRawMdiPhotoUnits } from "@/atsBorescope/lib/docx/rawMdiParser";
 import type { PhotosSection } from "@/atsBorescope/lib/docx/photosSectionMap";
-import { detectTemplateFamily, resolveClassify, resolvePhotosSubsections } from "@/atsBorescope/lib/docx/templateFamilies";
-import { findHeadingParagraph } from "@/atsBorescope/lib/docx/xmlTextUtils";
+import { familyForTemplate, resolveClassify, resolvePhotosSubsections } from "@/atsBorescope/lib/docx/templateFamilies";
+import { findPhotosHeading } from "@/atsBorescope/lib/docx/xmlTextUtils";
 import { createSession } from "@/atsBorescope/lib/reviewSession";
 
 export async function POST(request: NextRequest) {
@@ -21,14 +21,14 @@ export async function POST(request: NextRequest) {
     const templateLoaded = await loadDocx(templateBuffer);
     const units = parseRawMdiPhotoUnits(rawLoaded);
 
-    const family = detectTemplateFamily(templateLoaded.documentXml);
+    const family = familyForTemplate(templateLoaded.documentXml);
     if (!family) {
       return NextResponse.json(
-        { error: "Could not determine which report layout this template uses (unrecognized Photos subsection headings)." },
+        { error: "This doesn't look like a blank ATS report template: it has no \"Photos\" section with headings under it. Pick the model's blank Cover Page template." },
         { status: 400 },
       );
     }
-    const photosHeading = findHeadingParagraph(templateLoaded.documentXml, "Heading1", "Photos", 0);
+    const photosHeading = findPhotosHeading(templateLoaded.documentXml, 0);
     if (!photosHeading) {
       return NextResponse.json({ error: 'Could not find a "Photos" (Heading1) heading in the template.' }, { status: 400 });
     }

@@ -1,4 +1,4 @@
-import { findHeadingParagraph, findPrecedingPageBreakStart } from "./xmlTextUtils";
+import { findHeadingParagraph, findPrecedingPageBreakStart, findPhotosHeading } from "./xmlTextUtils";
 import type { PhotosSection } from "./photosSectionMap";
 
 /**
@@ -25,7 +25,7 @@ export function removeExcludedSections(
   const xml = documentXml;
   const removals: { start: number; end: number }[] = [];
 
-  const photosHeading = findHeadingParagraph(xml, "Heading1", "Photos", 0);
+  const photosHeading = findPhotosHeading(xml, 0);
   if (!photosHeading) throw new Error('Could not find a "Photos" (Heading1) heading in the template.');
 
   const observationsHeading = findHeadingParagraph(xml, "Heading1", "Observations", 0);

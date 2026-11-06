@@ -112,3 +112,9 @@ export function findPrecedingPageBreakStart(xml: string, beforePos: number): num
   if (breakIdx === -1 || breakIdx < beforePos - LOOKBACK) return null;
   return findParagraphStart(xml, breakIdx + 1);
 }
+
+/** The report's photos heading (Heading1): "Photos" in most ATS templates, "Unit Photos" in some
+ *  (RB211). */
+export function findPhotosHeading(xml: string, fromIndex = 0): { paragraphStart: number; paragraphEnd: number } | null {
+  return findHeadingParagraph(xml, "Heading1", "Photos", fromIndex) ?? findHeadingParagraph(xml, "Heading1", "Unit Photos", fromIndex);
+}

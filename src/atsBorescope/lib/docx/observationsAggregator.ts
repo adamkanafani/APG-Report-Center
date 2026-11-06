@@ -50,28 +50,48 @@ export function turbineRowKey(component: string): { stage: number; group: Turbin
   return null;
 }
 
+const sentenceCase = (s: string) => {
+  const t = s.trim().replace(/\s+/g, " ");
+  return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase().replace(/\bo'clock\b|\bo’clock\b/g, "o’clock");
+};
+
 /**
- * Deliberately mechanical, not a rewrite of Brett's stylistic rulebook: drops "Typical" units,
- * writes "No defects identified" if nothing's left, counts repeated distinct observations
- * (preserving the raw file's own front-to-back order), and joins with commas. A human is
- * expected to review/polish this -- see the red-text convention in observationsFiller.ts.
+ * One Observations condition, worded the way ATS's own reports word it (checked against ~1,500
+ * past reports in T:\!Jobs!\Working Jobs\400000 (ATS)): the observation in sentence case, then
+ * "at the" and each location it was seen at -- "Impact damage at the leading edge (2)", "Coating
+ * loss at the leading edge and at the trailing edge" -- in the raw file's own front-to-back order.
+ * `counts` adds the number of photos in parentheses, as ATS does in compressor rows (including
+ * "(1)"). "Typical" photos are left out; nothing left reads "No defects identified". Still blue
+ * in the report for the tech rep to review, like everything the app fills in.
  */
-function aggregateConditionText(units: RawPhotoUnit[]): string {
-  const nonTypical = units.filter((u) => u.observation && u.observation !== TYPICAL);
+export function aggregateConditionText(units: RawPhotoUnit[], options: { counts?: boolean } = {}): string {
+  const nonTypical = units.filter((u) => u.observation && !/^typical$/i.test(u.observation.trim()));
   if (nonTypical.length === 0) return "No defects identified";
 
-  const counts = new Map<string, number>();
-  const order: string[] = [];
+  const byObservation = new Map<string, { label: string; locations: string[]; count: number }>();
   for (const unit of nonTypical) {
-    const text = unit.observation as string;
-    if (!counts.has(text)) {
-      counts.set(text, 0);
-      order.push(text);
-    }
-    counts.set(text, counts.get(text)! + 1);
+    const label = sentenceCase(unit.observation as string);
+    const key = label.toLowerCase();
+    const entry = byObservation.get(key) ?? byObservation.set(key, { label, locations: [], count: 0 }).get(key)!;
+    entry.count++;
+    const location = unit.location?.trim().replace(/\s+/g, " ").toLowerCase();
+    if (location && !entry.locations.includes(location)) entry.locations.push(location);
   }
 
-  return order.map((text) => (counts.get(text)! > 1 ? `${text} (${counts.get(text)})` : text)).join(", ");
+  return [...byObservation.values()]
+    .map(({ label, locations, count }) => {
+      const list = (items: string[]) => (items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`);
+      // The raw observation sometimes already ends "at the"/"on the" ("Grind Marks At The" + "Tip"),
+      // or already says where ("Rub marks at 6 o'clock", "Discoloration at the tip") -- ATS leaves
+      // those as they are rather than adding the photo's location on top.
+      const joined = /\b(at|on|in) the$/i.test(label)
+        ? `${label} ${list(locations)}`
+        : / (at|on|in) /i.test(label) || locations.length === 0
+          ? label
+          : `${label} ${list(locations.map((l) => `at the ${l}`))}`;
+      return options.counts ? `${joined} (${count})` : joined;
+    })
+    .join(", ");
 }
 
 /**
@@ -116,7 +136,7 @@ export function aggregateObservations(units: RawPhotoUnit[], classify: (componen
 
   const compressor = new Map<string, string>();
   for (const [key, groupUnits] of compressorGroups) {
-    compressor.set(key, aggregateConditionText(groupUnits));
+    compressor.set(key, aggregateConditionText(groupUnits, { counts: true }));
   }
 
   const turbine: TurbineStageEntry[] = [];

@@ -2,11 +2,12 @@ import type { LoadedDocx } from "./zip";
 import { addImageRelationship } from "./zip";
 import type { RawPhotoUnit } from "./rawMdiParser";
 import type { PhotosSection } from "./photosSectionMap";
-import { detectTemplateFamily, resolveClassify, resolvePhotosSubsections, type TemplateFamily } from "./templateFamilies";
+import { familyForTemplate, resolveClassify, resolvePhotosSubsections, type TemplateFamily } from "./templateFamilies";
 import { buildPhotoBlockXml } from "./photoBlockBuilder";
-import { findHeadingParagraph, findPrecedingPageBreakStart } from "./xmlTextUtils";
+import { findHeadingParagraph, findPrecedingPageBreakStart, findPhotosHeading } from "./xmlTextUtils";
 import { aggregateObservations } from "./observationsAggregator";
 import { fillObservations } from "./observationsFiller";
+import { fillObservationsGeneric } from "./observationsGeneric";
 import { removeExcludedSections } from "./sectionExclusion";
 
 export interface AssembleResult {
@@ -53,15 +54,20 @@ export function assembleReport(template: LoadedDocx, units: RawPhotoUnit[], opti
   const overrides = options.overrides;
   const excludedSections = options.excludedSections ?? new Set<PhotosSection>();
 
-  const family = options.family ?? detectTemplateFamily(template.documentXml);
+  const family = options.family ?? familyForTemplate(template.documentXml);
   if (!family) {
-    throw new Error("Could not determine which report layout this template uses (unrecognized Photos subsection headings).");
+    throw new Error("This doesn't look like a blank ATS report template: it has no \"Photos\" section with headings under it.");
   }
 
-  const observationsResult = fillObservations(template.documentXml, aggregateObservations(units, family.classify));
+  // The GE families' own proven filler; every other model's template gets the generic one, which
+  // reads the template's own tables (observationsGeneric.ts).
+  const observationsResult =
+    family.id === "generic"
+      ? fillObservationsGeneric(template.documentXml, units)
+      : fillObservations(template.documentXml, aggregateObservations(units, family.classify));
   const xml = observationsResult.documentXml;
 
-  const photosHeading = findHeadingParagraph(xml, "Heading1", "Photos", 0);
+  const photosHeading = findPhotosHeading(xml, 0);
   if (!photosHeading) {
     throw new Error('Could not find a "Photos" (Heading1) heading in the template.');
   }
@@ -115,7 +121,7 @@ export function assembleReport(template: LoadedDocx, units: RawPhotoUnit[], opti
     const isExcluded = excludedSections.has(name);
     const unitsForSection = isExcluded ? [] : grouped.get(name) ?? [];
 
-    if (!isExcluded && unitsForSection.length === 0 && MANUAL_WHEN_EMPTY_SECTIONS.has(name)) {
+    if (!isExcluded && unitsForSection.length === 0 && (family.manualWhenEmpty ?? MANUAL_WHEN_EMPTY_SECTIONS).has(name)) {
       // No real photos for a manual-insert section -- leave the template's own example content
       // (and the blank space it occupies) exactly as it is, rather than wiping it to nothing.
       continue;

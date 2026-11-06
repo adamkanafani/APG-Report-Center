@@ -114,6 +114,13 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Scan failed");
       setScan(data);
+      // Open on the first section that got photos -- section names come from the model's own
+      // template, so "Compressor Section" isn't guaranteed to exist.
+      setSelectedSection(
+        (data as ScanResponse).photosSubsections.find((name) => (data as ScanResponse).bySection[name] > 0) ??
+          (data as ScanResponse).photosSubsections[0] ??
+          "Unassigned",
+      );
       setOverrides({});
       setDeletedIndices(new Set());
       setExcludedSections(new Set());
@@ -620,8 +627,10 @@ interface TemplateOption {
 function deriveUnitTypeFromRawFilename(rawPath: string | null): string | null {
   if (!rawPath) return null;
   const base = rawPath.split(/[\\/]/).pop() ?? "";
-  const match = /^([A-Za-z0-9.]+)_Full(?:_|\.|$)/i.exec(base);
-  return match ? match[1] : null;
+  // "7EA_Full_022825-Batavia.docx" -> "7EA"; other models' MDI setups name their exports the same
+  // way without "_Full" ("501D5A_060424..." -> "501D5A", "W251B11_..." -> "W251B11").
+  const match = /^([A-Za-z0-9.-]+?)_/i.exec(base);
+  return match && /\d/.test(match[1]) ? match[1] : null;
 }
 
 interface TemplatesResponse {

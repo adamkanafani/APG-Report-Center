@@ -38,6 +38,25 @@ seconds after five. The ATS apps' test scripts and sample reports stayed in
 their old repos (ATS-Borescope-Report-App, ATS-Report-Reviewer): the samples are customer reports and
 this repo is public.
 
+## ATS Borescope builder: every model
+
+The builder fills any model's blank ATS template, not just GE frames:
+
+- **Layouts.** GE 7EA-style and 7FA-style templates use their hand-checked layouts
+  (`templateFamilies.ts`). Every other template (501D5A, 501F, 501G, W251, Frame 5/6, 7B, LM6000,
+  Mitsubishi, V84, RB211, Trent, generators, ...) is read from the template itself: its Photos
+  sections are the headings under "Photos" (`genericFamily.ts`).
+- **Sorting photos.** Each photo's borescope component is sorted by what ATS's own past reports did
+  with it (`componentKnowledge.json`, learned from ~1,500 reports in `T:\!Jobs!\Working Jobs\400000 (ATS)`),
+  then keyword rules (`sectionKinds.ts`). Against those reports it puts 95-96% of photos in the same
+  section ATS did; the tech rep reviews and moves the rest. Refresh it with `scripts/ats-borescope/`.
+- **Observations.** Compressor and turbine Condition cells are filled for any template whose rows it
+  recognizes (GE "R1/S1", Westinghouse/Siemens "R1B/R1D", "Row N Vanes/Blades/Ring Segment"), in ATS's
+  wording: "Impact damage at the leading edge (1)".
+- **Templates.** Found in the Inspection Center (OEM/Model/Cover Page) when it's synced, the
+  ATS Cover Page Templates folder, a folder picked with "Choose templates folder...", or a plugged-in
+  drive, and matched to the raw file's unit (e.g. `501D5A_...docx` finds "501D5 _501D5A").
+
 # Vanes & Nozzles builder
 
 Built around how the V&N tech reps write their reports (Alfredo Resendiz on nozzles and support rings;

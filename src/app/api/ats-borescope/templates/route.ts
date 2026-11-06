@@ -3,7 +3,7 @@ import { promises as fs } from "fs";
 import os from "os";
 import path from "path";
 import { loadDocx } from "@/atsBorescope/lib/docx/zip";
-import { detectTemplateFamily } from "@/atsBorescope/lib/docx/templateFamilies";
+import { familyForTemplate } from "@/atsBorescope/lib/docx/templateFamilies";
 import { listUploadedTemplates } from "@/atsBorescope/lib/docx/uploadedTemplates";
 
 /** ATS's shared library of blank cover-page templates -- one per unit/job type (35 and
@@ -17,6 +17,10 @@ import { listUploadedTemplates } from "@/atsBorescope/lib/docx/uploadedTemplates
 //  4. any drive plugged in or mapped (D: to Z:): the field techs carry their job files and
 //     templates on a physical drive.
 const TEMPLATES_FOLDER = "ATS Cover Page Templates";
+// ATS's SharePoint Inspection Center (synced or added as a OneDrive shortcut): one folder per OEM
+// and model, each with its own "Cover Page" folder holding that model's blank template -- every
+// model ATS inspects, where the flat ATS Cover Page Templates folder only has some.
+const INSPECTION_CENTER = "____ Inspection Center";
 const SETTINGS_FILE = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "APGReportCenter", "ats-borescope.json");
 
 async function isDir(p: string) {
@@ -32,7 +36,7 @@ async function savedTemplatesDir(): Promise<string | null> {
  * directory listing per folder, so even a big mapped drive is quick. */
 async function findUnder(root: string, depth: number): Promise<string | null> {
   const entries = await fs.readdir(root, { withFileTypes: true }).catch(() => []);
-  const hit = entries.find((e) => e.isDirectory() && e.name.toLowerCase() === TEMPLATES_FOLDER.toLowerCase());
+  const hit = entries.find((e) => e.isDirectory() && [TEMPLATES_FOLDER, INSPECTION_CENTER].some((n) => e.name.toLowerCase() === n.toLowerCase()));
   if (hit) return path.join(root, hit.name);
   if (depth === 0) return null;
   for (const e of entries.slice(0, 300)) {
@@ -41,6 +45,48 @@ async function findUnder(root: string, depth: number): Promise<string | null> {
     if (found) return found;
   }
   return null;
+}
+
+/** A folder named `name` at most `depth` levels under `root` (SharePoint shortcuts land a level or
+ *  two down, e.g. "ATS - Documents/Resource Center/____ Inspection Center"). */
+async function findNamed(root: string, name: string, depth: number): Promise<string | null> {
+  const entries = await fs.readdir(root, { withFileTypes: true }).catch(() => []);
+  const hit = entries.find((e) => e.name.toLowerCase() === name.toLowerCase());
+  if (hit && (await isDir(path.join(root, hit.name)))) return path.join(root, hit.name);
+  if (depth === 0) return null;
+  for (const e of entries.slice(0, 300)) {
+    if (e.name.startsWith(".") || e.name.startsWith("$") || /\.\w{2,4}$/.test(e.name)) continue;
+    const p = path.join(root, e.name);
+    if (!(await isDir(p))) continue;
+    const found = await findNamed(p, name, depth - 1);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** Every blank template in a folder: the .docx files directly in it (a flat folder like ATS Cover
+ *  Page Templates), plus -- for the Inspection Center's OEM/Model/Cover Page layout -- the .docx
+ *  files in any "Cover Page" folder up to three levels down, labeled with their model folder.
+ *  Archives, sample reports and anything else are left out. */
+async function listTemplates(dir: string): Promise<TemplateOption[]> {
+  const out: TemplateOption[] = [];
+  const isBlank = (n: string) => n.toLowerCase().endsWith(".docx") && !n.startsWith("~$") && !/sample report/i.test(n);
+  const walk = async (d: string, depth: number, model: string | null) => {
+    const entries = await fs.readdir(d, { withFileTypes: true }).catch(() => []);
+    for (const e of entries) {
+      const p = path.join(d, e.name);
+      const isFolder = await isDir(p);
+      if (!isFolder) {
+        if (isBlank(e.name) && (depth === 0 || /^cover pages?$/i.test(path.basename(d)))) out.push({ name: model ? `${model}: ${e.name}` : e.name, path: p, model: model ?? undefined });
+        continue;
+      }
+      if (depth >= 3 || /archive|sample report|^mdi$|procedure|^til$|unit (photos|prep|specifications)/i.test(e.name)) continue;
+      // The model is the folder that holds "Cover Page" (e.g. "501D5 _501D5A").
+      await walk(p, depth + 1, /^cover pages?$/i.test(e.name) ? path.basename(d) : model);
+    }
+  };
+  await walk(dir, 0, null);
+  return out.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
 }
 
 async function remember(dir: string) {
@@ -54,6 +100,11 @@ async function findTemplatesDir(): Promise<string | null> {
   const override = process.env.ATS_TEMPLATES_DIR?.trim();
   if (override && (await isDir(override))) return override;
   const home = os.homedir();
+  // The Inspection Center first: it has every model's template.
+  for (const root of [path.join(home, "OneDrive - Allied Power Group"), home]) {
+    const ic = await findNamed(root, INSPECTION_CENTER, 3);
+    if (ic) return ic;
+  }
   for (const root of [path.join(home, "OneDrive - Allied Power Group"), home]) {
     // Usually <root>/Strategy - Files/ATS Reporting/ATS Cover Page Templates; any library or folder
     // one level down also works, so a differently named shortcut is still found.
@@ -90,8 +141,9 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const dir = typeof body.dir === "string" ? body.dir.trim() : "";
   if (!dir || !(await isDir(dir))) return NextResponse.json({ error: "That folder couldn't be opened." }, { status: 400 });
-  const docx = (await fs.readdir(dir)).filter((n) => n.toLowerCase().endsWith(".docx"));
-  if (docx.length === 0) return NextResponse.json({ error: "That folder has no Word templates (.docx) in it. Pick the folder the blank ATS templates are in." }, { status: 400 });
+  if ((await listTemplates(dir)).length === 0) {
+    return NextResponse.json({ error: "No blank Word templates (.docx) were found in that folder. Pick the folder the blank ATS templates are in, or the Inspection Center." }, { status: 400 });
+  }
   await remember(dir);
   return NextResponse.json({ ok: true, dir });
 }
@@ -99,6 +151,8 @@ export async function POST(request: NextRequest) {
 interface TemplateOption {
   name: string;
   path: string;
+  /** Inspection Center only: the model folder it came from, e.g. "501D5 _501D5A". */
+  model?: string;
 }
 
 /** Legacy Frame 7 unit variants (Frame 7, 7C, 7E, 7EA) share the same base report structure --
@@ -110,8 +164,23 @@ interface TemplateOption {
 const UNIT_TYPE_ALIAS_GROUPS: string[][] = [["7EA", "7E", "7C", "FRAME 7"]];
 
 function unitAliasGroup(unit: string): string[] {
-  const upper = unit.toUpperCase();
+  const upper = unit.toUpperCase().replace(/^W(?=\d)/, ""); // W501D5A -> 501D5A
   return UNIT_TYPE_ALIAS_GROUPS.find((group) => group.includes(upper)) ?? [upper];
+}
+
+/** Whether a template is for this unit type: its name starts with the unit ("7EA Borescope ..."),
+ *  or its model folder / name has the unit as a word ("501D5 _501D5A" for 501D5A), or a word the
+ *  unit ends with ("D5_D5A Borescope Cover Page" for 501D5A). */
+function matchesUnit(t: TemplateOption, unit: string): boolean {
+  const aliases = unitAliasGroup(unit);
+  const file = path.basename(t.path).toUpperCase();
+  if (aliases.some((a) => file.startsWith(`${a} `))) return true;
+  const words = `${t.model ?? ""} ${file.replace(/\.DOCX$/, "")}`
+    .toUpperCase()
+    .split(/[\s_\-,&/()]+/)
+    .map((w) => w.replace(/^W(?=\d)/, ""))
+    .filter(Boolean);
+  return aliases.some((a) => words.some((w) => w === a || (w.length >= 3 && /\d/.test(w) && a.endsWith(w))));
 }
 
 /** Curated list shown on the template-picker step, so the user doesn't have to browse folders
@@ -144,27 +213,21 @@ export async function GET(request: NextRequest) {
   if (!TEMPLATES_DIR) return NextResponse.json({ templates: [], fullList: [], uploaded, error: NOT_FOUND });
 
   try {
-    const entries = await fs.readdir(TEMPLATES_DIR, { withFileTypes: true });
-    const fullList: TemplateOption[] = entries
-      // "Sample Report" files are finished examples kept for style reference, not blank
-      // templates -- excluded here since assembling into one throws (no fillable placeholders).
-      .filter((e) => e.isFile() && e.name.toLowerCase().endsWith(".docx") && !e.name.toLowerCase().includes("sample report"))
-      .map((e) => ({ name: e.name, path: path.join(TEMPLATES_DIR, e.name) }))
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
+    // "Sample Report" files are finished examples kept for style reference, not blank templates.
+    const fullList = await listTemplates(TEMPLATES_DIR);
 
     if (!unit) {
       return NextResponse.json({ templates: fullList, fullList, uploaded, unit: null, matchedCount: 0, dir: TEMPLATES_DIR });
     }
 
-    const aliasGroup = unitAliasGroup(unit);
-    const unitMatches = fullList.filter((t) => aliasGroup.some((alias) => t.name.toUpperCase().startsWith(`${alias} `)));
+    const unitMatches = fullList.filter((t) => matchesUnit(t, unit));
 
     const automated: TemplateOption[] = [];
     for (const t of unitMatches) {
       try {
         const buffer = await fs.readFile(t.path);
         const loaded = await loadDocx(buffer);
-        if (detectTemplateFamily(loaded.documentXml)) automated.push(t);
+        if (familyForTemplate(loaded.documentXml)) automated.push(t);
       } catch {
         // Unreadable/corrupt template -- skip it rather than fail the whole list.
       }

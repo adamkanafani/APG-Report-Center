@@ -1,4 +1,4 @@
-import { findHeadingParagraph, findRowsInRange, findCellsInRange, extractText } from "./xmlTextUtils";
+import { findHeadingParagraph, findRowsInRange, findCellsInRange, extractText, findPhotosHeading } from "./xmlTextUtils";
 import type { ObservationsAggregation } from "./observationsAggregator";
 
 export interface FillObservationsResult {
@@ -27,8 +27,8 @@ const ADD_APPLICABLE_PATTERN = /^\s*Add Applicable\s*%\s*$/i;
 
 /** Scoped to the Observations section only, same reasoning as the old resetPercentPlaceholders --
  *  "?" is specifically what this one placeholder should become, not a general substitution. */
-function replaceAddApplicablePlaceholder(documentXml: string, obsHeadingStart: number): string {
-  const photosHeading = findHeadingParagraph(documentXml, "Heading1", "Photos", obsHeadingStart);
+export function replaceAddApplicablePlaceholder(documentXml: string, obsHeadingStart: number): string {
+  const photosHeading = findPhotosHeading(documentXml, obsHeadingStart);
   const regionEnd = photosHeading ? photosHeading.paragraphStart : documentXml.length;
 
   const before = documentXml.slice(0, obsHeadingStart);
@@ -147,7 +147,7 @@ export function fillObservations(documentXml: string, aggregation: ObservationsA
 /** Replaces a cell's paragraph content (from its first <w:p> to its last </w:p>) with a single
  *  fresh paragraph carrying `newText` in blue, reusing the original paragraph's properties
  *  (alignment/spacing) and font size where present. */
-function buildCellReplacement(xml: string, cell: { start: number; end: number }, newText: string): { start: number; end: number; replacement: string } {
+export function buildCellReplacement(xml: string, cell: { start: number; end: number }, newText: string): { start: number; end: number; replacement: string } {
   const cellXml = xml.slice(cell.start, cell.end);
   const pPrMatch = /<w:pPr>[\s\S]*?<\/w:pPr>/.exec(cellXml);
   const pPr = pPrMatch ? pPrMatch[0] : "";

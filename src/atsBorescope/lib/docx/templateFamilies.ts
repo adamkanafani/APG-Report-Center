@@ -1,5 +1,7 @@
-import { findHeadingParagraph } from "./xmlTextUtils";
+import { findHeadingParagraph, findPhotosHeading } from "./xmlTextUtils";
 import type { PhotosSection } from "./photosSectionMap";
+import { buildGenericFamily } from "./genericFamily";
+import type { SectionKind } from "./sectionKinds";
 
 /**
  * One Photos subsection this family's templates *can* have. Most are `required`: every
@@ -38,6 +40,11 @@ export interface TemplateFamily {
    *  even for a template instance that doesn't have it -- resolveClassify() handles the
    *  fallback, callers should use that instead of calling this directly. */
   classify: (component: string) => PhotosSection | null;
+  /** Sections whose template content is left alone when no photo lands there (the template's own
+   *  example photos stay). The GE families use the assembler's default (Inlet Section only). */
+  manualWhenEmpty?: Set<PhotosSection>;
+  /** Generic (read-from-template) families only: what each section is about -- see sectionKinds.ts. */
+  kindOf?: (section: PhotosSection) => SectionKind;
 }
 
 interface Rule {
@@ -246,7 +253,7 @@ export const TEMPLATE_FAMILIES: TemplateFamily[] = [FRAME_STANDARD_FAMILY, FRAME
  * misdetected as the smaller/less specific family.
  */
 export function detectTemplateFamily(documentXml: string): TemplateFamily | null {
-  const photosHeading = findHeadingParagraph(documentXml, "Heading1", "Photos", 0);
+  const photosHeading = findPhotosHeading(documentXml, 0);
   if (!photosHeading) return null;
 
   const candidates = [...TEMPLATE_FAMILIES].sort((a, b) => requiredSections(b).length - requiredSections(a).length);
@@ -284,4 +291,13 @@ export function resolveClassify(family: TemplateFamily, resolvedSections: Set<Ph
     const spec = family.photosSubsectionSpecs.find((s) => s.section === section);
     return spec?.optional?.fallback ?? section;
   };
+}
+
+/**
+ * The layout for any template: one of the two GE families when it matches theirs exactly (their
+ * proven, hand-checked rules), otherwise one read from the template's own headings
+ * (genericFamily.ts) -- which is how every other model ATS inspects is handled.
+ */
+export function familyForTemplate(documentXml: string): TemplateFamily | null {
+  return detectTemplateFamily(documentXml) ?? buildGenericFamily(documentXml);
 }

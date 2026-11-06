@@ -51,3 +51,6 @@ next-env.d.ts
 
 # Borescope templates uploaded on this computer (src/atsBorescope/lib/docx/uploadedTemplates.ts)
 /uploaded-templates/
+
+# Made on each computer by scripts/make-shortcuts.cmd (holds that computer's full paths)
+/APG Report Center.lnk

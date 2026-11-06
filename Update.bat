@@ -22,6 +22,9 @@ echo.
 echo Rebuilding the app...
 call npm run build
 echo.
+echo Refreshing the "APG Report Center" shortcut in this folder...
+call scripts\make-shortcuts.cmd
+echo.
 echo ============================================
 echo   Update complete! Your saved job reviews were not affected.
 echo ============================================

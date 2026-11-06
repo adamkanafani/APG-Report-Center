@@ -45,8 +45,8 @@ done — press any key to close the window.
 
 ## Using the app day-to-day
 
-Double-click **APG Report Center** on your desktop (or
-**`Start Report Center.bat`** in the app folder). Two things will happen:
+Double-click **APG Report Center** on your desktop (or in the app folder).
+Two things will happen:
 
 - A window titled **"APG Report Center - Server"** opens. **Leave this
   open** while you work (you can minimize it) — closing it shuts the app
@@ -59,6 +59,11 @@ Pick your line of business, then your report builder:
 - **Inspection** → ATS Borescope Report Builder, or ATS Report Reviewer
 
 Then pick your job folder like normal and work through the report.
+
+**Lost the desktop icon?** In the app folder, right-click **APG Report
+Center** (the one with the APG spire) → **Show more options** → **Send to** →
+**Desktop (create shortcut)**. It keeps the spire icon. (Sending
+`Start Report Center.bat` itself gives a plain icon instead.)
 
 ## Getting updates
 

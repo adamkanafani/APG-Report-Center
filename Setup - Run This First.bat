@@ -40,7 +40,7 @@ if errorlevel 1 (
 )
 echo.
 echo Adding the APG Report Center icon to your desktop...
-powershell -NoProfile -Command "$app = (Get-Location).Path; $lnk = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) 'APG Report Center.lnk')); $lnk.TargetPath = (Join-Path $app 'Start Report Center.bat'); $lnk.WorkingDirectory = $app; $lnk.IconLocation = (Join-Path $app 'src\app\favicon.ico'); $lnk.Description = 'APG Report Center'; $lnk.Save()"
+call scripts\make-shortcuts.cmd desktop
 echo.
 echo ============================================
 echo   Setup complete!

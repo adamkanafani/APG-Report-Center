@@ -29,8 +29,8 @@ load, so one builder's CSS never reaches another's pages. Both builders' saved s
 old standalone apps kept it, so reviews in progress carry over.
 
 The ATS Report Reviewer needs `ANTHROPIC_API_KEY` in `.env.local` for its AI checks, and opens only
-with the 6-digit reviewer PIN, since those checks are paid per report. `scripts/set-reviewer-pin.mjs`
-(run by setup, and by `Set Reviewer PIN.bat`) writes the key and a salted scrypt hash of the PIN
+with the 6-digit reviewer PIN, since those checks are paid per report. `Set Reviewer PIN.bat`
+(`scripts/set-reviewer-pin.mjs`, run only on reviewers' computers) writes the key and a salted scrypt hash of the PIN
 (`ATS_REVIEWER_PIN_HASH`) to `.env.local`; the PIN itself is never stored, and never belongs in this
 public repo. `src/atsReviewer/lib/pinLock.ts` checks it: the right PIN sets a signed, httpOnly cookie
 good for 12 hours, every Reviewer API route refuses without it, and wrong guesses slow to one per 30

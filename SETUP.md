@@ -1,10 +1,10 @@
 # APG Report Center — Setup Guide
 
 This app runs on your own computer and reads your job folders directly, so
-each tech rep needs their own copy running locally. It does **not** need an
+each person needs their own copy running locally. It does **not** need an
 internet connection to work (aside from the one-time download below), and it
-does **not** need any account. The one exception is the ATS Report Reviewer's AI
-checks, which need the Anthropic API key that setup asks report reviewers for.
+does **not** need any API key or account. The one exception is the ATS
+Report Reviewer, which only report reviewers use — see the last section.
 
 ## One-time setup (about 10 minutes)
 
@@ -26,8 +26,8 @@ instead of having to re-download everything by hand each time.)*
 ### 3. Download the app
 
 Open a folder where you want the app to live — e.g. your Desktop or
-Documents — right-click inside it, choose **"Open in Terminal"** (or
-"Git Bash Here" if you see that option), and run:
+Documents (not a shared team folder) — right-click inside it, choose
+**"Open in Terminal"** (or "Git Bash Here" if you see that option), and run:
 
 ```
 git clone https://github.com/adamkanafani/APG-Report-Center.git
@@ -37,22 +37,10 @@ This creates a new folder called `APG-Report-Center`. Open that folder.
 
 ### 4. Run setup
 
-Double-click **`Setup - Run This First.bat`**. A black window opens.
-
-1. It asks **"Is this a report reviewer's computer? (y/N)"**.
-   - Most people: just press **Enter**. The ATS Report Reviewer stays locked
-     on this computer; everything else works.
-   - Report reviewers: type **y** and press Enter, paste the **Anthropic API
-     key**, then type the **6-digit reviewer PIN** twice.
-2. It then does some work for a few minutes (this is normal, even if it
-   looks like nothing is happening for a bit). When it says "Setup
-   complete!", you're done — press any key to close the window.
-
-The ATS Report Reviewer's AI checks are paid per report, so it only opens
-with the reviewer PIN. The PIN is never saved as-is: setup keeps a scrambled
-copy in a file called `.env.local` in the app folder, which never leaves the
-computer. To change the key or PIN later, close the app, double-click
-**`Set Reviewer PIN.bat`**, then start the app again.
+Double-click **`Setup - Run This First.bat`**. A black window will open and
+do some work for a few minutes (this is normal, even if it looks like
+nothing is happening for a bit). When it says "Setup complete!", you're
+done — press any key to close the window.
 
 ## Using the app day-to-day
 
@@ -63,24 +51,12 @@ Double-click **`Start Report Center.bat`**. Two things will happen:
   down. Close it when you're done for the day.
 - Your web browser opens the app automatically a few seconds later.
 
-Pick your line of business (Parts, Repair, Inspection, …), then the report
-builder for your part, then your job folder, and work through the report.
+Pick your line of business, then your report builder:
 
-## Coming from one of the old report builders
+- **Parts** → Vanes & Nozzles, or Buckets & Blades
+- **Inspection** → ATS Borescope Report Builder, or ATS Report Reviewer
 
-The Vanes & Nozzles, Tech Rep (buckets & blades), ATS Borescope and ATS Report
-Reviewer apps all live inside this one now (Parts → Vanes & Nozzles or Buckets
-& Blades; Inspection → ATS Borescope Report Builder or ATS Report Reviewer).
-
-- Reports you'd already started in the V&N or Tech Rep app show up here as they
-  were -- the saved progress lives outside the app folders.
-- If you uploaded your own templates in the ATS Borescope app, copy its
-  `uploaded-templates` folder into this app's folder.
-- Report reviewers: if you answered "N" during setup, double-click
-  `Set Reviewer PIN.bat` to add the API key and PIN.
-
-Close the old app before starting this one; once you're working here you can
-delete the old folder.
+Then pick your job folder like normal and work through the report.
 
 ## Getting updates
 
@@ -89,12 +65,26 @@ inside the app folder. It downloads the changes and rebuilds automatically.
 This does **not** affect any reports you've already started reviewing —
 your saved progress lives outside this folder and is untouched.
 
+## Coming from one of the old report builders
+
+The Vanes & Nozzles, Tech Rep (buckets & blades), ATS Borescope and ATS
+Report Reviewer apps all live inside this one now.
+
+- Reports you'd already started in the V&N or Tech Rep app show up here as
+  they were — the saved progress lives outside the app folders.
+- If you uploaded your own templates in the ATS Borescope app, copy its
+  `uploaded-templates` folder into this app's folder.
+
+Close the old app before starting this one; once you're working here you can
+delete the old folder.
+
 ## A couple of things worth knowing
 
 - **No internet needed day-to-day.** Once it's set up, the app runs
   entirely on your own computer.
-- **No account, no login.** The only settings are the API key and PIN for
-  report reviewers, asked for during setup.
+- **No API key, no account, no login** — for everything except the ATS
+  Report Reviewer (below). The ATS Borescope Report Builder, Vanes & Nozzles
+  and Buckets & Blades are open to everyone.
 - **Your job folders** — the app just needs to be able to browse to
   wherever your job folders already live (network drive, OneDrive, etc.),
   same as you'd browse to them in File Explorer.
@@ -102,3 +92,20 @@ your saved progress lives outside this folder and is untouched.
   (no PDF print in the job folder). With Excel installed the app prints them
   to PDF for you when the report is built; without it, they're listed as
   skipped so you can print them yourself.
+
+## Report reviewers only: the ATS Report Reviewer
+
+The ATS Report Reviewer's checks use Claude AI, which is paid per report, so
+it opens only with the 6-digit reviewer PIN. Nobody else needs this step.
+
+On a reviewer's computer, after setup:
+
+1. Close the app's server window if it's open.
+2. Double-click **`Set Reviewer PIN.bat`** in the app folder.
+3. Paste the **Anthropic API key** and press Enter.
+4. Type the **reviewer PIN**, press Enter, and type it again.
+5. Start the app again with **`Start Report Center.bat`**.
+
+The PIN is never saved as-is: a scrambled copy goes in a file called
+`.env.local` in the app folder, which never leaves the computer. Run
+`Set Reviewer PIN.bat` again any time the key or PIN changes.

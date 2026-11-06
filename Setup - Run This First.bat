@@ -18,9 +18,6 @@ if errorlevel 1 (
 )
 echo Node.js found.
 echo.
-echo ATS Report Reviewer setup:
-call node scripts\set-reviewer-pin.mjs --setup
-echo.
 echo Installing app dependencies - this can take a few minutes the first time...
 call npm install
 if errorlevel 1 (

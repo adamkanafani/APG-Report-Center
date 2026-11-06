@@ -1,6 +1,6 @@
-// Sets up the ATS Report Reviewer on this computer: the Anthropic API key its AI checks use, and the
-// 6-digit reviewer PIN that unlocks it. Run by "Setup - Run This First.bat" (with --setup, which
-// first asks whether this is a reviewer's computer) and by "Set Reviewer PIN.bat".
+// Sets up the ATS Report Reviewer on a reviewer's computer: the Anthropic API key its AI checks use,
+// and the 6-digit reviewer PIN that unlocks it. Run by "Set Reviewer PIN.bat" -- only on reviewers'
+// computers; nothing else in the Report Center needs it (the ATS Borescope Report Builder included).
 //
 // Both go into .env.local in the app folder, which is never uploaded to GitHub. The PIN itself is
 // not stored: only a salted scrypt hash of it (ATS_REVIEWER_PIN_HASH), in the same form
@@ -13,7 +13,6 @@ import readline from "readline";
 import { fileURLToPath } from "url";
 
 const ENV_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", ".env.local");
-const setupMode = process.argv.includes("--setup");
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
 // Answers are queued as lines arrive, so typed and piped input both work (readline's own question()
@@ -45,15 +44,6 @@ const hashPin = (pin) => {
 try {
   let lines = readEnv();
   const hasKey = lines.some((line) => /^ANTHROPIC_API_KEY=\S+/.test(line));
-
-  if (setupMode) {
-    console.log("The ATS Report Reviewer's checks use Claude AI, which is paid per report.");
-    const answer = (await ask("Is this a report reviewer's computer? (y/N): ")).trim().toLowerCase();
-    if (answer !== "y" && answer !== "yes") {
-      console.log("Skipped -- the Reviewer stays locked on this computer.");
-      process.exit(0);
-    }
-  }
 
   const keyPrompt = hasKey ? "Anthropic API key (press Enter to keep the one already saved): " : "Anthropic API key (press Enter to skip): ";
   const key = (await ask(keyPrompt)).trim();

@@ -6,7 +6,25 @@ internet connection to work (aside from the one-time download below), and it
 does **not** need any API key or account. The one exception is the ATS
 Report Reviewer, which only the report reviewer uses — see the last section.
 
-## One-time setup (about 10 minutes)
+## Quick install (recommended)
+
+1. Get **`Install APG Report Center.cmd`** — from whoever sent you a link
+   to it, or from
+   https://github.com/adamkanafani/APG-Report-Center/blob/main/Install%20APG%20Report%20Center.cmd
+   with the **Download raw file** button (the down-arrow icon at the top right
+   of the file).
+2. Double-click it. If Windows says **"Windows protected your PC"**, click
+   **More info** → **Run anyway**. If it asks to allow an installer to make
+   changes, click **Yes**.
+3. Wait 5–10 minutes until it says **Done!** It installs Node.js and Git if
+   needed, puts the app in `C:\Users\<you>\APG-Report-Center`, and adds the
+   **APG Report Center** icon (the APG spire) to your desktop.
+
+Running it again later updates and repairs the app. If it can't install
+Node.js or Git on its own (usually a missing-admin-rights issue), it opens
+their download page — install it, then double-click the file again.
+
+## Manual setup (about 10 minutes)
 
 ### 1. Install Node.js
 

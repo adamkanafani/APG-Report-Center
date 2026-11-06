@@ -1,0 +1,4 @@
+# Windows scripts keep CRLF line endings even in the repo, so one downloaded straight from GitHub
+# (the one-click installer) runs correctly in cmd.
+*.cmd -text
+*.bat -text

@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   if (!result.ok) {
     const error =
       result.reason === "not-set-up"
-        ? "No reviewer PIN is set up on this computer yet. Run \"Set Reviewer PIN.bat\" in the app folder."
+        ? "The ATS Report Reviewer is for the report reviewer only and isn't set up on this computer."
         : result.reason === "wait"
           ? `Too many wrong tries. Wait ${result.waitSeconds} seconds and try again.`
           : "That PIN isn't right.";

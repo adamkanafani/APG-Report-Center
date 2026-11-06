@@ -40,7 +40,7 @@ export function PinGate({ configured }: { configured: boolean }) {
         </div>
         {configured ? (
           <>
-            <p className="folder-picker-subtitle">The Reviewer&apos;s AI checks are paid per report, so it opens with the 6-digit reviewer PIN.</p>
+            <p className="folder-picker-subtitle">For the report reviewer only. Its AI checks are paid per report, so it opens with the reviewer&apos;s 6-digit PIN.</p>
             <form onSubmit={unlock} className="pin-form">
               <input
                 className="pin-input"
@@ -62,7 +62,7 @@ export function PinGate({ configured }: { configured: boolean }) {
           </>
         ) : (
           <p className="folder-picker-subtitle">
-            The Reviewer isn&apos;t set up on this computer. Ask whoever installed the Report Center to run &quot;Set Reviewer PIN.bat&quot; in the app folder.
+            The ATS Report Reviewer is for the report reviewer only and isn&apos;t set up on this computer.
           </p>
         )}
       </div>

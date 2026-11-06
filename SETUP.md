@@ -4,7 +4,7 @@ This app runs on your own computer and reads your job folders directly, so
 each person needs their own copy running locally. It does **not** need an
 internet connection to work (aside from the one-time download below), and it
 does **not** need any API key or account. The one exception is the ATS
-Report Reviewer, which only report reviewers use — see the last section.
+Report Reviewer, which only the report reviewer uses — see the last section.
 
 ## One-time setup (about 10 minutes)
 
@@ -93,12 +93,14 @@ delete the old folder.
   to PDF for you when the report is built; without it, they're listed as
   skipped so you can print them yourself.
 
-## Report reviewers only: the ATS Report Reviewer
+## The report reviewer only: the ATS Report Reviewer
 
-The ATS Report Reviewer's checks use Claude AI, which is paid per report, so
-it opens only with the 6-digit reviewer PIN. Nobody else needs this step.
+The ATS Report Reviewer is for one person, the report reviewer. Its checks
+use Claude AI, which is paid per report, so it opens only with the
+reviewer's 6-digit PIN. Everyone else sees it locked; skip this section on
+their computers.
 
-On a reviewer's computer, after setup:
+On the report reviewer's computer only, after setup:
 
 1. Close the app's server window if it's open.
 2. Double-click **`Set Reviewer PIN.bat`** in the app folder.

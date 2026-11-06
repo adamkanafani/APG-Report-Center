@@ -1,6 +1,6 @@
-// Sets up the ATS Report Reviewer on a reviewer's computer: the Anthropic API key its AI checks use,
-// and the 6-digit reviewer PIN that unlocks it. Run by "Set Reviewer PIN.bat" -- only on reviewers'
-// computers; nothing else in the Report Center needs it (the ATS Borescope Report Builder included).
+// Sets up the ATS Report Reviewer on the report reviewer's computer (it's one person's tool): the
+// Anthropic API key its AI checks use, and the 6-digit PIN that unlocks it. Run by
+// "Set Reviewer PIN.bat" -- only on that computer; nothing else in the Report Center needs it (the ATS Borescope Report Builder included).
 //
 // Both go into .env.local in the app folder, which is never uploaded to GitHub. The PIN itself is
 // not stored: only a salted scrypt hash of it (ATS_REVIEWER_PIN_HASH), in the same form

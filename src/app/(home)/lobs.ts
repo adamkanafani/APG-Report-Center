@@ -3,7 +3,9 @@
 // root layout and stylesheet, so moving between them is a full page load either way.
 
 export type Builder = { name: string; covers: string; href?: string };
-export type Lob = { id: string; name: string; blurb: string; builders: Builder[]; note?: string };
+/** Each line's buttons wear the look of the apps behind them: APG blue, or the ATS black-and-red. */
+export type Theme = "apg" | "ats";
+export type Lob = { id: string; name: string; blurb: string; theme: Theme; builders: Builder[]; note?: string };
 
 const VANES_NOZZLES: Builder = {
   name: "Vanes & Nozzles",
@@ -20,34 +22,31 @@ const BUCKETS_BLADES: Builder = {
 export const LOBS: Lob[] = [
   {
     id: "parts",
+    theme: "apg",
     name: "Parts",
     blurb: "I&A and Final reports for repaired parts",
     builders: [VANES_NOZZLES, BUCKETS_BLADES],
   },
   {
     id: "field-service",
+    theme: "apg",
     name: "Field Service",
     blurb: "Coming soon",
     builders: [],
   },
   {
-    id: "repair",
-    name: "Repair",
-    blurb: "Repair reports, built with the Parts builders for now",
-    builders: [VANES_NOZZLES, BUCKETS_BLADES],
-    note: "Repair reports use the same builders as Parts until Repair has its own.",
-  },
-  {
     id: "inspection",
+    theme: "ats",
     name: "Inspection",
     blurb: "ATS borescope reports",
     builders: [
-      { name: "ATS Borescope Report Builder", covers: "Moving into this app next" },
-      { name: "ATS Report Reviewer", covers: "Moving into this app next" },
+      { name: "ATS Borescope Report Builder", covers: "Builds the ATS borescope report from the raw borescope file", href: "/inspection/borescope" },
+      { name: "ATS Report Reviewer", covers: "Checks and corrects an inspector's ATS report before it goes out", href: "/inspection/reviewer" },
     ],
   },
   {
     id: "generator",
+    theme: "apg",
     name: "Generator",
     blurb: "Coming soon",
     builders: [],

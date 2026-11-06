@@ -10,34 +10,225 @@
 
 .home .lob-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 14px;
   position: relative;
   z-index: 1;
+}
+
+/* An odd tile out on the last row (Generator) sits centered under the two columns. */
+.home .lob-grid > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+  justify-self: center;
+  width: calc(50% - 7px);
+}
+
+@media (max-width: 600px) {
+  .home .lob-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .home .lob-grid > :last-child:nth-child(odd) {
+    width: 100%;
+  }
 }
 
 .home .lob-tile {
   text-decoration: none;
   min-height: 92px;
   justify-content: center;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+  /* Text stays clear of the mark at the right edge. */
+  padding-right: 92px;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.home .lob-tile > span {
+  position: relative;
+  z-index: 1;
 }
 
 .home .lob-tile .report-type-option-label {
   font-size: 19px;
 }
 
+/* Each tile carries its apps' mark at the right edge: the APG mark, or the ATS blade fan. */
+.home .lob-tile::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -10px;
+  width: 92px;
+  height: 92px;
+  transform: translateY(-50%);
+  background: url("/apg-mark-transparent.png") center / contain no-repeat;
+  opacity: 0.16;
+  pointer-events: none;
+}
+
+/* APG: a metallic white-to-blue plate, the Report Center's own blues with a light sheen across the
+   top. (Coming-soon tiles stay plain and dimmed.) */
+.home .lob-tile.theme-apg:not(.soon) {
+  background: linear-gradient(135deg, #ffffff 0%, #eef5fd 22%, #cfe4fb 48%, #9dc2ec 74%, #6fa3e0 100%);
+  border: 1px solid #b7d0ee;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -2px 6px rgba(11, 61, 145, 0.18), 0 8px 20px rgba(11, 61, 145, 0.18);
+}
+
+.home .lob-tile.theme-apg:not(.soon)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  /* The fixed sheen across the top, plus a glint parked off the right edge until hover. */
+  background:
+    linear-gradient(110deg, transparent 40%, rgba(255, 255, 255, 0.6) 50%, transparent 60%),
+    linear-gradient(170deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.15) 38%, rgba(255, 255, 255, 0) 39%, rgba(255, 255, 255, 0.12) 100%);
+  background-size: 300% 100%, 100% 100%;
+  background-position: 100% 0, 0 0;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
+.home .lob-tile.theme-apg:not(.soon) .report-type-option-label {
+  color: #0b3d91;
+}
+
+.home .lob-tile.theme-apg:not(.soon) .report-type-option-description {
+  color: #1a2f55;
+}
+
+.home .lob-tile.theme-apg:not(.soon):hover {
+  background: linear-gradient(135deg, #6fa3e0 0%, #2f6cc0 45%, #0b3d91 100%);
+  border-color: #0b3d91;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 14px 30px rgba(11, 61, 145, 0.35), 0 0 30px rgba(111, 163, 224, 0.5);
+}
+
+.home .lob-tile.theme-apg:not(.soon):hover .report-type-option-label,
+.home .lob-tile.theme-apg:not(.soon):hover .report-type-option-description {
+  color: #ffffff;
+}
+
+/* APG's own fidget: the tile lifts, a glint sweeps across the metal once, and the APG mark (a spire)
+   rises with a little spring, where the ATS fan turns instead. */
+.home .lob-tile.theme-apg:not(.soon) {
+  transition: transform 0.2s ease, background 0.15s, border-color 0.2s, box-shadow 0.2s;
+}
+
+.home .lob-tile.theme-apg:not(.soon)::after {
+  transition: opacity 0.2s, transform 0.45s cubic-bezier(0.34, 1.7, 0.64, 1);
+}
+
+.home .lob-tile.theme-apg:not(.soon):hover {
+  transform: translateY(-2px);
+}
+
+.home .lob-tile.theme-apg:not(.soon):hover::before {
+  animation: apg-glint 0.4s ease-out;
+}
+
+.home .lob-tile.theme-apg:not(.soon):hover::after {
+  opacity: 0.4;
+  filter: brightness(0) invert(1);
+  transform: translateY(calc(-50% - 10px)) scale(1.1);
+}
+
+@keyframes apg-glint {
+  from {
+    background-position: 100% 0, 0 0;
+  }
+  to {
+    background-position: 0% 0, 0 0;
+  }
+}
+
+/* ATS: the ATS apps' black card, red heading, red glow and red dot grid. */
+.home .lob-tile.theme-ats {
+  background: #0d0d0d;
+  border: 1px solid rgba(224, 70, 77, 0.45);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35), 0 0 24px rgba(122, 26, 32, 0.35);
+}
+
+.home .lob-tile.theme-ats::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(to bottom, #e0464d 0%, #7a1a20 55%, #000000 100%);
+  -webkit-mask-image: radial-gradient(circle, #000 22%, transparent 23%);
+  mask-image: radial-gradient(circle, #000 22%, transparent 23%);
+  -webkit-mask-size: 10px 10px;
+  mask-size: 10px 10px;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.home .lob-tile.theme-ats::after {
+  background-image: url("/ats-blade-fan.png");
+  opacity: 0.55;
+}
+
+.home .lob-tile.theme-ats .report-type-option-label {
+  color: #e0464d;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.home .lob-tile.theme-ats .report-type-option-description {
+  color: #d9d9d9;
+}
+
+/* Hover stays black (no red fill): the tile lifts, its edge and glow light up red, the dot grid
+   brightens and the blade fan turns a little. */
+.home .lob-tile.theme-ats::before,
+.home .lob-tile.theme-ats::after {
+  transition: opacity 0.2s, transform 0.35s ease;
+}
+
+.home .lob-tile.theme-ats {
+  transition: transform 0.2s ease, border-color 0.2s, box-shadow 0.2s;
+}
+
+.home .lob-tile.theme-ats:hover {
+  background: #0d0d0d;
+  transform: translateY(-2px);
+  border-color: #e0464d;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.4), 0 0 34px rgba(224, 70, 77, 0.5);
+}
+
+.home .lob-tile.theme-ats:hover::before {
+  opacity: 0.6;
+}
+
+.home .lob-tile.theme-ats:hover::after {
+  opacity: 0.9;
+  transform: translateY(-50%) rotate(-12deg);
+}
+
+.home .lob-tile.theme-ats:hover .report-type-option-label {
+  color: #ff5a61;
+}
+
+.home .lob-tile.theme-ats:hover .report-type-option-description {
+  color: #ffffff;
+}
+
+/* Coming soon: dimmed, and no hover change. */
 .home .lob-tile.soon {
   opacity: 0.55;
   cursor: default;
 }
 
-.home .lob-tile.soon:hover {
+.home .lob-tile.soon.theme-apg:hover {
   border-color: #d5e1f2;
   background: rgba(255, 255, 255, 0.85);
   color: #0b3d91;
 }
 
-.home .lob-tile.soon:hover .report-type-option-description {
+.home .lob-tile.soon.theme-apg:hover::after {
+  opacity: 0.16;
+  filter: none;
+}
+
+.home .lob-tile.soon.theme-apg:hover .report-type-option-description {
   color: #33507a;
 }
 
@@ -47,4 +238,180 @@
   color: #33507a;
   position: relative;
   z-index: 1;
+}
+
+/* The Report Center's own backdrop, so it doesn't read as one of the builders' screens: navy at the
+   top-left running to light blue at the bottom-right, with a white blueprint grid and turbine-like
+   rings sweeping out of the bottom-right corner, both fading toward the top-left. */
+.home::after {
+  background: linear-gradient(135deg, #0b3d91 0%, #1f5bb5 35%, #5f97dc 70%, #a9cbf1 100%);
+}
+
+.home::before {
+  background:
+    repeating-radial-gradient(circle at 100% 100%, transparent 0 46px, rgba(255, 255, 255, 0.22) 46px 48px),
+    linear-gradient(rgba(255, 255, 255, 0.14) 1px, transparent 1px) 0 0 / 120px 120px,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.14) 1px, transparent 1px) 0 0 / 120px 120px,
+    linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px) 0 0 / 24px 24px;
+  -webkit-mask-image: radial-gradient(ellipse at 100% 100%, #000 0%, rgba(0, 0, 0, 0.55) 55%, rgba(0, 0, 0, 0.2) 100%);
+  mask-image: radial-gradient(ellipse at 100% 100%, #000 0%, rgba(0, 0, 0, 0.55) 55%, rgba(0, 0, 0, 0.2) 100%);
+  opacity: 1;
+}
+
+/* Logo, subtitle and back link go white to read on the navy. */
+.home .app-logo-icon {
+  filter: brightness(0) invert(1) drop-shadow(0 3px 6px rgba(0, 0, 0, 0.3));
+}
+
+.home .app-logo h1 {
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.home .app-wordmark-eyebrow {
+  color: #cfe0f6;
+}
+
+.home .app-logo-bar {
+  background: linear-gradient(to right, #ffffff, #9dc2ec);
+}
+
+.home .folder-picker-subtitle,
+.home .home-link,
+.home .lob-note {
+  color: #e6effb;
+}
+
+/* Inspection (an ATS line): ATS red floods out over the blue from where its tile was clicked, led by
+   a white shock ring (BackdropShift.tsx). The red layer sits between the blue gradient and the white
+   grid, so the grid and rings carry on over the red. */
+.home-entrance::after {
+  z-index: -3;
+}
+
+.backdrop-shift {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background: linear-gradient(135deg, #3d0a0f 0%, #7a1a20 35%, #b8303a 70%, #e0646a 100%);
+  clip-path: circle(150vmax at var(--ox, 100%) var(--oy, 100%));
+  animation: backdrop-flood 1.1s cubic-bezier(0.65, 0, 0.35, 1) 0.15s both;
+}
+
+.backdrop-shift-ring {
+  position: fixed;
+  left: var(--ox, 100%);
+  top: var(--oy, 100%);
+  width: 0;
+  height: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 24px rgba(255, 140, 145, 0.7), inset 0 0 24px rgba(255, 140, 145, 0.5);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  animation: backdrop-ring 1.1s cubic-bezier(0.65, 0, 0.35, 1) 0.15s both;
+}
+
+@keyframes backdrop-flood {
+  from {
+    clip-path: circle(0 at var(--ox, 100%) var(--oy, 100%));
+  }
+  to {
+    clip-path: circle(150vmax at var(--ox, 100%) var(--oy, 100%));
+  }
+}
+
+@keyframes backdrop-ring {
+  0% {
+    width: 0;
+    height: 0;
+    opacity: 1;
+  }
+  80% {
+    opacity: 0.6;
+  }
+  100% {
+    width: 300vmax;
+    height: 300vmax;
+    opacity: 0;
+  }
+}
+
+/* Parts: a scan beam sweeps down the page like a part going through inspection, leaving brushed
+   steel blue behind it and uncovering the APG spire in the bottom-right corner as it passes. */
+.backdrop-scan {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.14) 42%, transparent 54%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 2px, transparent 2px 5px),
+    linear-gradient(135deg, #061f4d 0%, #0b3d91 30%, #3f74bd 62%, #8fb3df 85%, #d3e2f4 100%);
+  clip-path: inset(0 0 0 0);
+  animation: backdrop-scan 1.1s cubic-bezier(0.65, 0, 0.35, 1) 0.15s both;
+}
+
+.backdrop-scan-beam {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(to right, transparent, #ffffff 15%, #ffffff 85%, transparent);
+  box-shadow: 0 0 18px 4px rgba(157, 194, 236, 0.9), 0 0 60px 14px rgba(111, 163, 224, 0.55);
+  opacity: 0;
+  animation: backdrop-scan-beam 1.1s cubic-bezier(0.65, 0, 0.35, 1) 0.15s both;
+}
+
+.backdrop-spire {
+  /* Full-screen and clipped exactly like the steel layer, so the beam uncovers the spire as it
+     passes over it. */
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: url("/apg-mark-transparent.png") right 4vw bottom 0 / min(38vw, 440px) auto no-repeat;
+  filter: brightness(0) invert(1);
+  opacity: 0.14;
+  animation: backdrop-scan 1.1s cubic-bezier(0.65, 0, 0.35, 1) 0.15s both;
+}
+
+@keyframes backdrop-scan {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes backdrop-scan-beam {
+  0% {
+    top: 0;
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    top: 100vh;
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop-shift,
+  .backdrop-shift-ring,
+  .backdrop-scan,
+  .backdrop-scan-beam,
+  .backdrop-spire {
+    animation: none;
+  }
 }

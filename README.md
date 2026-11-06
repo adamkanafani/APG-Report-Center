@@ -6,8 +6,7 @@ then the report builder:
 | Line of business | Builders |
 |---|---|
 | Parts | Vanes & Nozzles (nozzles, vanes, compressor diaphragms, blade rings, ISOs, air seals, support rings); Buckets & Blades |
-| Repair | The Parts builders, until Repair has its own |
-| Inspection | ATS Borescope Report Builder and ATS Report Reviewer (moving in next) |
+| Inspection | ATS Borescope Report Builder; ATS Report Reviewer |
 | Field Service | Coming soon |
 | Generator | Coming soon |
 
@@ -22,10 +21,22 @@ Each builder keeps its own screens, styles, API and library, so they can't step 
 | Home screens | `src/app/(home)` | -- | -- | -- |
 | Vanes & Nozzles | `src/app/(vanes-nozzles)` → `/parts/vanes-nozzles` | `/api/vn/*` | `src/lib` | `%LOCALAPPDATA%\VNReportApp` |
 | Buckets & Blades | `src/app/(buckets-blades)` → `/parts/buckets-blades` | `/api/bb/*` | `src/bucketsBlades/lib` | `%LOCALAPPDATA%\TechRepReportApp` |
+| ATS Borescope | `src/app/(ats-borescope)` → `/inspection/borescope` | `/api/ats-borescope/*` | `src/atsBorescope/lib` | uploaded templates in `uploaded-templates/` (not committed) |
+| ATS Report Reviewer | `src/app/(ats-reviewer)` → `/inspection/reviewer` | `/api/ats-reviewer/*` | `src/atsReviewer/lib` | none (finished reviews are held in memory until downloaded) |
 
 Each `(group)` folder has its own root layout and stylesheet; moving between builders is a full page
 load, so one builder's CSS never reaches another's pages. Both builders' saved state stays where the
 old standalone apps kept it, so reviews in progress carry over.
+
+The ATS Report Reviewer needs `ANTHROPIC_API_KEY` in `.env.local` for its AI checks, and opens only
+with the 6-digit reviewer PIN, since those checks are paid per report. `scripts/set-reviewer-pin.mjs`
+(run by setup, and by `Set Reviewer PIN.bat`) writes the key and a salted scrypt hash of the PIN
+(`ATS_REVIEWER_PIN_HASH`) to `.env.local`; the PIN itself is never stored, and never belongs in this
+public repo. `src/atsReviewer/lib/pinLock.ts` checks it: the right PIN sets a signed, httpOnly cookie
+good for 12 hours, every Reviewer API route refuses without it, and wrong guesses slow to one per 30
+seconds after five. The ATS apps' test scripts and sample reports stayed in
+their old repos (ATS-Borescope-Report-App, ATS-Report-Reviewer): the samples are customer reports and
+this repo is public.
 
 # Vanes & Nozzles builder
 

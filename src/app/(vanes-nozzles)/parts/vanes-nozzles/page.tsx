@@ -236,7 +236,7 @@ function FolderPicker({ onJobFolderChosen, onBack }: { onJobFolderChosen: (path:
     setQuery("");
     setSearchResults(null);
     try {
-      const url = target ? `/api/vn/vn/browse?dir=${encodeURIComponent(target)}` : "/api/vn/vn/browse";
+      const url = target ? `/api/vn/browse?dir=${encodeURIComponent(target)}` : "/api/vn/browse";
       const res = await fetch(url);
       const data = await res.json();
       if (!res.ok) {
@@ -278,7 +278,7 @@ function FolderPicker({ onJobFolderChosen, onBack }: { onJobFolderChosen: (path:
     const controller = new AbortController();
     const handle = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/vn/vn/browse?dir=${encodeURIComponent(dir)}&q=${encodeURIComponent(query.trim())}`, { signal: controller.signal });
+        const res = await fetch(`/api/vn/browse?dir=${encodeURIComponent(dir)}&q=${encodeURIComponent(query.trim())}`, { signal: controller.signal });
         const data = await res.json();
         if (res.ok && !controller.signal.aborted) {
           setSearchResults(data.results ?? []);
@@ -457,7 +457,7 @@ function ManualAttachmentUpload({
       form.append("jobRoot", jobRoot);
       form.append("sectionId", sectionId);
       for (const file of files) form.append("file", file);
-      const res = await fetch("/api/vn/vn/manual-attachment", { method: "POST", body: form });
+      const res = await fetch("/api/vn/manual-attachment", { method: "POST", body: form });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Upload failed");
       // The file(s) now sit inside the job folder itself (see manualAttachmentsFor's convention),
@@ -501,7 +501,7 @@ function ManualAttachmentUpload({
   const removeFile = async (baseName: string) => {
     setRemoving(baseName);
     try {
-      const res = await fetch("/api/vn/vn/manual-attachment", {
+      const res = await fetch("/api/vn/manual-attachment", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobRoot, sectionId, fileName: baseName }),
@@ -645,7 +645,7 @@ function TablePreview({
   const save = async () => {
     setBusy(true);
     try {
-      await fetch("/api/vn/vn/section-state", {
+      await fetch("/api/vn/section-state", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobRoot, sectionId: section.id, patch: { tableEdits: edits, tableNotes: notesText } }),
@@ -796,7 +796,7 @@ function NarrativeEditor({
   const runDraft = async (withInstruction?: string) => {
     setBusy(true);
     try {
-      const res = await fetch("/api/vn/vn/draft", {
+      const res = await fetch("/api/vn/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         // reportType too, so the server re-scans against this report's own section list rather than
@@ -818,7 +818,7 @@ function NarrativeEditor({
   const saveManualEdit = async () => {
     setBusy(true);
     try {
-      await fetch("/api/vn/vn/section-state", {
+      await fetch("/api/vn/section-state", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobRoot, sectionId: section.id, patch: { [fsText ? "compactContent" : "content"]: draft, draftError: null } }),
@@ -839,7 +839,7 @@ function NarrativeEditor({
     setPendingStartOver(null);
     setBusy(true);
     try {
-      const res = await fetch("/api/vn/vn/draft", {
+      const res = await fetch("/api/vn/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobRoot, sectionId: section.id, reportType, source }),
@@ -949,7 +949,7 @@ function AttachAsIs({ jobRoot, section, onRefresh }: { jobRoot: string; section:
 
   const choose = async (relativePath: string) => {
     setSelected(relativePath);
-    await fetch("/api/vn/vn/section-state", {
+    await fetch("/api/vn/section-state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jobRoot, sectionId: section.id, patch: { selectedAttachmentPath: relativePath } }),
@@ -964,7 +964,7 @@ function AttachAsIs({ jobRoot, section, onRefresh }: { jobRoot: string; section:
     setExcluding(relativePath);
     try {
       const nextExcluded = [...(section.state.excludedMatchedPaths ?? []), relativePath];
-      const res = await fetch("/api/vn/vn/section-state", {
+      const res = await fetch("/api/vn/section-state", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobRoot, sectionId: section.id, patch: { excludedMatchedPaths: nextExcluded } }),
@@ -980,7 +980,7 @@ function AttachAsIs({ jobRoot, section, onRefresh }: { jobRoot: string; section:
     }
   };
 
-  const fileUrl = (relativePath: string) => `/api/vn/vn/photo-file?jobRoot=${encodeURIComponent(jobRoot)}&path=${encodeURIComponent(relativePath)}`;
+  const fileUrl = (relativePath: string) => `/api/vn/photo-file?jobRoot=${encodeURIComponent(jobRoot)}&path=${encodeURIComponent(relativePath)}`;
 
   if (candidates.length === 0) {
     return (
@@ -1097,7 +1097,7 @@ function MultiAttach({ jobRoot, section, onRefresh }: { jobRoot: string; section
 
   const save = async (next: string[]) => {
     setSelected(next);
-    await fetch("/api/vn/vn/section-state", {
+    await fetch("/api/vn/section-state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jobRoot, sectionId: section.id, patch: { selectedAttachmentPaths: next } }),
@@ -1115,7 +1115,7 @@ function MultiAttach({ jobRoot, section, onRefresh }: { jobRoot: string; section
   const exclude = async (relativePath: string) => {
     setExcluding(relativePath);
     try {
-      await fetch("/api/vn/vn/section-state", {
+      await fetch("/api/vn/section-state", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1133,7 +1133,7 @@ function MultiAttach({ jobRoot, section, onRefresh }: { jobRoot: string; section
     }
   };
 
-  const fileUrl = (relativePath: string) => `/api/vn/vn/photo-file?jobRoot=${encodeURIComponent(jobRoot)}&path=${encodeURIComponent(relativePath)}`;
+  const fileUrl = (relativePath: string) => `/api/vn/photo-file?jobRoot=${encodeURIComponent(jobRoot)}&path=${encodeURIComponent(relativePath)}`;
   // Ticked files first, in print order, then everything else in scan order.
   const ordered = [
     ...selected.map((p) => candidates.find((f) => f.relativePath === p)).filter((f): f is JobFile => Boolean(f)),
@@ -1265,7 +1265,7 @@ function CoverEditor({
     setBusy(true);
     try {
       const patch = { fields: values, customFields, fieldOrder: rowOrder };
-      await fetch("/api/vn/vn/section-state", {
+      await fetch("/api/vn/section-state", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobRoot, sectionId: section.id, patch }),
@@ -1450,7 +1450,7 @@ function SectionPanel({
   // doesn't change what's found on disk, just whether generateReport.ts uses it (see
   // renderReportHtml.ts's own excludePrintPdf check) -- toggled back on the same way.
   const setExcludePrintPdf = async (excluded: boolean) => {
-    await fetch("/api/vn/vn/section-state", {
+    await fetch("/api/vn/section-state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jobRoot, sectionId: section.id, patch: { excludePrintPdf: excluded } }),
@@ -1597,7 +1597,7 @@ export default function Home() {
   const runScan = async (root: string) => {
     setLoading(true);
     try {
-      const res = await fetch("/api/vn/vn/scan", {
+      const res = await fetch("/api/vn/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobRoot: root, reportType }),
@@ -1652,7 +1652,7 @@ export default function Home() {
       const byId = new Map(prev.sections.map((s) => [s.id, s]));
       return { ...prev, sections: ids.map((id) => byId.get(id)!), sectionOrder: ids };
     });
-    fetch("/api/vn/vn/section-order", {
+    fetch("/api/vn/section-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jobRoot, order: ids, reportType }),
@@ -1667,7 +1667,7 @@ export default function Home() {
   const setExcludeFromReport = async (sectionId: string, excluded: boolean) => {
     if (!jobRoot) return;
     patchSectionState(sectionId, { excludeFromReport: excluded });
-    await fetch("/api/vn/vn/section-state", {
+    await fetch("/api/vn/section-state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jobRoot, sectionId, patch: { excludeFromReport: excluded } }),
@@ -1682,7 +1682,7 @@ export default function Home() {
       const next = scan.sections[idx + 1];
       if (next) setSelectedId(next.id);
     }
-    await fetch("/api/vn/vn/section-state", {
+    await fetch("/api/vn/section-state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jobRoot, sectionId, patch: { acknowledged } }),
@@ -1738,7 +1738,7 @@ export default function Home() {
     const title = titleIn;
     if (action === "add" && !title?.trim()) return;
     try {
-      const res = await fetch("/api/vn/vn/custom-section", {
+      const res = await fetch("/api/vn/custom-section", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobRoot, reportType, action, id, title }),
@@ -1783,7 +1783,7 @@ export default function Home() {
   // one -- FS copies of the sheets and the FS repair lists. Rescans so the panel shows that version.
   const setVariant = async (variant: JobScanResult["variant"]) => {
     if (!jobRoot || scan?.variant === variant) return;
-    await fetch("/api/vn/vn/report-variant", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jobRoot, reportType, variant }) });
+    await fetch("/api/vn/report-variant", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jobRoot, reportType, variant }) });
     await runScan(jobRoot);
   };
 
@@ -1792,7 +1792,7 @@ export default function Home() {
     if (!jobRoot) return;
     setGenerating("pdf");
     try {
-      const res = await fetch("/api/vn/vn/generate-pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jobRoot, reportType }) });
+      const res = await fetch("/api/vn/generate-pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jobRoot, reportType }) });
       if (!res.ok) throw new Error(await failMessage(res, "PDF generation failed"));
       await saveDownload(res, `${scan?.metadata.jobNumber ?? "report"} ${reportType === "final" ? "Repair" : "IA"} Report${scan?.variant === "fs" ? " FS" : ""}.pdf`);
       reportOmissions(res);

@@ -146,7 +146,7 @@ function FolderPicker({ onJobFolderChosen, onBack }: { onJobFolderChosen: (path:
     setQuery("");
     setSearchResults(null);
     try {
-      const url = target ? `/api/bb/bb/browse?dir=${encodeURIComponent(target)}` : "/api/bb/bb/browse";
+      const url = target ? `/api/bb/browse?dir=${encodeURIComponent(target)}` : "/api/bb/browse";
       const res = await fetch(url);
       const data = await res.json();
       if (!res.ok) {
@@ -185,7 +185,7 @@ function FolderPicker({ onJobFolderChosen, onBack }: { onJobFolderChosen: (path:
     setSearching(true);
     const handle = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/bb/bb/browse?dir=${encodeURIComponent(dir)}&q=${encodeURIComponent(query.trim())}`);
+        const res = await fetch(`/api/bb/browse?dir=${encodeURIComponent(dir)}&q=${encodeURIComponent(query.trim())}`);
         const data = await res.json();
         if (res.ok) {
           setSearchResults(data.results ?? []);
@@ -378,7 +378,7 @@ function ManualAttachmentUpload({
       form.append("jobRoot", jobRoot);
       form.append("sectionId", sectionId);
       for (const file of files) form.append("file", file);
-      const res = await fetch("/api/bb/bb/manual-attachment", { method: "POST", body: form });
+      const res = await fetch("/api/bb/manual-attachment", { method: "POST", body: form });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Upload failed");
       // The file(s) now sit inside the job folder itself (see manualAttachmentsFor's convention),
@@ -422,7 +422,7 @@ function ManualAttachmentUpload({
   const removeFile = async (baseName: string) => {
     setRemoving(baseName);
     try {
-      const res = await fetch("/api/bb/bb/manual-attachment", {
+      const res = await fetch("/api/bb/manual-attachment", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobRoot, sectionId, fileName: baseName }),
@@ -566,7 +566,7 @@ function TablePreview({
   const save = async () => {
     setBusy(true);
     try {
-      await fetch("/api/bb/bb/section-state", {
+      await fetch("/api/bb/section-state", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobRoot, sectionId: section.id, patch: { tableEdits: edits, tableNotes: notesText } }),
@@ -715,7 +715,7 @@ function NarrativeEditor({
   const runDraft = async (withInstruction?: string) => {
     setBusy(true);
     try {
-      const res = await fetch("/api/bb/bb/draft", {
+      const res = await fetch("/api/bb/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobRoot, sectionId: section.id, instruction: withInstruction }),
@@ -735,7 +735,7 @@ function NarrativeEditor({
   const saveManualEdit = async () => {
     setBusy(true);
     try {
-      await fetch("/api/bb/bb/section-state", {
+      await fetch("/api/bb/section-state", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobRoot, sectionId: section.id, patch: { content: draft, draftError: null } }),
@@ -798,7 +798,7 @@ function StandardDiagramToggle({ jobRoot, section, turbineModel }: { jobRoot: st
     setIncluded(next);
     setBusy(true);
     try {
-      await fetch("/api/bb/bb/section-state", {
+      await fetch("/api/bb/section-state", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobRoot, sectionId: "iaSummary", patch: { includeStandardDiagram: next } }),
@@ -841,7 +841,7 @@ function PhotoSetEditor({ jobRoot, section }: { jobRoot: string; section: Sectio
   const toggle = async (relativePath: string) => {
     const next = selected.includes(relativePath) ? selected.filter((p) => p !== relativePath) : [...selected, relativePath];
     setSelected(next);
-    await fetch("/api/bb/bb/section-state", {
+    await fetch("/api/bb/section-state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jobRoot, sectionId: section.id, patch: { selectedPhotoPaths: next } }),
@@ -893,7 +893,7 @@ function PhotoSetEditor({ jobRoot, section }: { jobRoot: string; section: Sectio
           {shown.map((f) => (
             <div key={f.relativePath} className={`photo-tile ${selected.includes(f.relativePath) ? "selected" : ""}`} onClick={() => toggle(f.relativePath)}>
               <img
-                src={`/api/bb/bb/photo-file?jobRoot=${encodeURIComponent(jobRoot)}&path=${encodeURIComponent(f.relativePath)}`}
+                src={`/api/bb/photo-file?jobRoot=${encodeURIComponent(jobRoot)}&path=${encodeURIComponent(f.relativePath)}`}
                 alt={f.relativePath}
                 loading="lazy"
               />
@@ -947,7 +947,7 @@ function AttachAsIs({ jobRoot, section, onRefresh }: { jobRoot: string; section:
 
   const choose = async (relativePath: string) => {
     setSelected(relativePath);
-    await fetch("/api/bb/bb/section-state", {
+    await fetch("/api/bb/section-state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jobRoot, sectionId: section.id, patch: { selectedAttachmentPath: relativePath } }),
@@ -962,7 +962,7 @@ function AttachAsIs({ jobRoot, section, onRefresh }: { jobRoot: string; section:
     setExcluding(relativePath);
     try {
       const nextExcluded = [...(section.state.excludedMatchedPaths ?? []), relativePath];
-      const res = await fetch("/api/bb/bb/section-state", {
+      const res = await fetch("/api/bb/section-state", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobRoot, sectionId: section.id, patch: { excludedMatchedPaths: nextExcluded } }),
@@ -978,7 +978,7 @@ function AttachAsIs({ jobRoot, section, onRefresh }: { jobRoot: string; section:
     }
   };
 
-  const fileUrl = (relativePath: string) => `/api/bb/bb/photo-file?jobRoot=${encodeURIComponent(jobRoot)}&path=${encodeURIComponent(relativePath)}`;
+  const fileUrl = (relativePath: string) => `/api/bb/photo-file?jobRoot=${encodeURIComponent(jobRoot)}&path=${encodeURIComponent(relativePath)}`;
 
   if (candidates.length === 0) {
     return (
@@ -1124,7 +1124,7 @@ function CoverEditor({
     setBusy(true);
     try {
       const patch = { fields: values, customFields, fieldOrder: rowOrder };
-      await fetch("/api/bb/bb/section-state", {
+      await fetch("/api/bb/section-state", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobRoot, sectionId: section.id, patch }),
@@ -1300,7 +1300,7 @@ function SectionPanel({
   // doesn't change what's found on disk, just whether generateReport.ts uses it (see
   // renderReportHtml.ts's own excludePrintPdf check) -- toggled back on the same way.
   const setExcludePrintPdf = async (excluded: boolean) => {
-    await fetch("/api/bb/bb/section-state", {
+    await fetch("/api/bb/section-state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jobRoot, sectionId: section.id, patch: { excludePrintPdf: excluded } }),
@@ -1396,7 +1396,7 @@ export default function Home() {
   const runScan = async (root: string) => {
     setLoading(true);
     try {
-      const res = await fetch("/api/bb/bb/scan", {
+      const res = await fetch("/api/bb/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobRoot: root, reportType }),
@@ -1451,7 +1451,7 @@ export default function Home() {
       const byId = new Map(prev.sections.map((s) => [s.id, s]));
       return { ...prev, sections: ids.map((id) => byId.get(id)!), sectionOrder: ids };
     });
-    fetch("/api/bb/bb/section-order", {
+    fetch("/api/bb/section-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jobRoot, order: ids }),
@@ -1466,7 +1466,7 @@ export default function Home() {
   const setExcludeFromReport = async (sectionId: string, excluded: boolean) => {
     if (!jobRoot) return;
     patchSectionState(sectionId, { excludeFromReport: excluded });
-    await fetch("/api/bb/bb/section-state", {
+    await fetch("/api/bb/section-state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jobRoot, sectionId, patch: { excludeFromReport: excluded } }),
@@ -1481,7 +1481,7 @@ export default function Home() {
       const next = scan.sections[idx + 1];
       if (next) setSelectedId(next.id);
     }
-    await fetch("/api/bb/bb/section-state", {
+    await fetch("/api/bb/section-state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jobRoot, sectionId, patch: { acknowledged } }),
@@ -1492,7 +1492,7 @@ export default function Home() {
     if (!jobRoot) return;
     setGenerating(true);
     try {
-      const res = await fetch("/api/bb/bb/generate-pdf", {
+      const res = await fetch("/api/bb/generate-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobRoot, reportType }),

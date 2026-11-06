@@ -89,7 +89,7 @@ export function PhotoPagePicker({
     const order = labels.flatMap((label) => cleaned[label].filter((p): p is string => Boolean(p)));
     const slots: Record<string, number> = {};
     for (const label of labels) cleaned[label].forEach((p, i) => p && (slots[p] = i));
-    fetch("/api/vn/vn/section-state", {
+    fetch("/api/vn/section-state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -159,7 +159,7 @@ export function PhotoPagePicker({
     if (next) setFocus(next);
   };
 
-  const url = (p: string, w: number) => `/api/vn/vn/photo-file?jobRoot=${encodeURIComponent(jobRoot)}&path=${encodeURIComponent(p)}&w=${w}`;
+  const url = (p: string, w: number) => `/api/vn/photo-file?jobRoot=${encodeURIComponent(jobRoot)}&path=${encodeURIComponent(p)}&w=${w}`;
   const name = (p: string) => p.split("/").pop();
   const iaPick = section.state.selectedPhotoPathsByReport?.ia ?? section.state.selectedPhotoPaths;
   const groupLabels = [...new Set([...groups.map((g) => g.label), ...STANDARD_GROUPS])].sort((a, b) => labelRank(a) - labelRank(b));

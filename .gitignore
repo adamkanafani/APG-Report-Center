@@ -48,3 +48,6 @@ next-env.d.ts
 
 # sample outputs generated from real job folders -- customer data, never committed
 /samples/
+
+# Borescope templates uploaded on this computer (src/atsBorescope/lib/docx/uploadedTemplates.ts)
+/uploaded-templates/

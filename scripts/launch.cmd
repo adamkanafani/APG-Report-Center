@@ -7,6 +7,7 @@ rem    1. If the app is already running, just opens it in the browser.
 rem    2. Otherwise checks GitHub for a newer version. If there is one, installs it in a window
 rem       of its own ("Updating") before starting -- so nobody has to remember Update.bat.
 rem       No internet (or no Git): skips the check and starts the version already here.
+rem       Also rebuilds when this folder's code is newer than its build (.next\APG_COMMIT).
 rem    3. Starts the server window and opens the browser.
 rem  Usage: launch.cmd <app folder>          (normal start)
 rem         launch.cmd <app folder> update   (the update step, run in its own window)
@@ -19,6 +20,7 @@ cd /d "%APP%"
 set "PATH=%PATH%;%ProgramFiles%\nodejs;%ProgramFiles%\Git\cmd;%LOCALAPPDATA%\Programs\Git\cmd"
 if not defined APG_PORT set "APG_PORT=3002"
 if /i "%~2"=="update" goto update
+if /i "%~2"=="rebuild" goto rebuild
 
 title APG Report Center - Launcher
 
@@ -38,11 +40,33 @@ git fetch -q origin main >nul 2>nul
 if errorlevel 1 goto start
 set "BEHIND=0"
 for /f %%c in ('git rev-list --count HEAD..origin/main 2^>nul') do set "BEHIND=%%c"
-if "%BEHIND%"=="0" goto start
+if "%BEHIND%"=="0" goto built
 if "%APG_NO_START%"=="1" (
   call "%~f0" "%APP%" update
 ) else (
   start "APG Report Center - Updating" /wait cmd /c ""%~f0" "%APP%" update"
+)
+goto start
+
+:built
+rem Nothing new on GitHub -- but is the build this folder's version? A folder whose code changed
+rem without the launcher's update (changes made and pushed from this same folder) still has the
+rem old build, so rebuild it. A build from before this check existed is taken as current.
+set "HEAD_NOW="
+for /f %%h in ('git rev-parse HEAD 2^>nul') do set "HEAD_NOW=%%h"
+if not defined HEAD_NOW goto start
+if not exist ".next\BUILD_ID" goto start
+if not exist ".next\APG_COMMIT" (
+  > ".next\APG_COMMIT" echo %HEAD_NOW%
+  goto start
+)
+set "BUILT="
+set /p BUILT=<".next\APG_COMMIT"
+if "%BUILT%"=="%HEAD_NOW%" goto start
+if "%APG_NO_START%"=="1" (
+  call "%~f0" "%APP%" rebuild
+) else (
+  start "APG Report Center - Updating" /wait cmd /c ""%~f0" "%APP%" rebuild"
 )
 
 :start
@@ -83,6 +107,19 @@ if errorlevel 1 (
   if not "%APG_NO_START%"=="1" pause
   exit /b 0
 )
+goto build
+
+:rebuild
+title APG Report Center - Updating
+echo ============================================
+echo   Updating the APG Report Center
+echo ============================================
+echo.
+echo This copy changed since it was last built. This takes a minute or two -- the
+echo app opens on its own when it's done.
+echo.
+
+:build
 call npm install --no-fund --no-audit
 call npm run build
 if errorlevel 1 (
@@ -93,5 +130,7 @@ if errorlevel 1 (
   if not "%APG_NO_START%"=="1" pause
   exit /b 1
 )
+rem Which version this build is, for the check above.
+for /f %%h in ('git rev-parse HEAD 2^>nul') do > ".next\APG_COMMIT" echo %%h
 call scripts\make-shortcuts.cmd
 exit /b 0

@@ -5,7 +5,7 @@ then the report builder:
 
 | Line of business | Builders |
 |---|---|
-| Parts | Vanes & Nozzles (nozzles, vanes, compressor diaphragms, blade rings, ISOs, air seals, support rings); Buckets & Blades |
+| Repair | Vanes & Nozzles (nozzles, vanes, compressor diaphragms, blade rings, ISOs, air seals, support rings); Buckets & Blades |
 | Inspection | ATS Borescope Report Builder; ATS Report Reviewer |
 | Field Service | Coming soon |
 | Generator | Coming soon |

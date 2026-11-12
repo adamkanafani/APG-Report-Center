@@ -21,9 +21,9 @@ const BUCKETS_BLADES: Builder = {
 
 export const LOBS: Lob[] = [
   {
-    id: "parts",
+    id: "repair",
     theme: "apg",
-    name: "Parts",
+    name: "Repair",
     blurb: "I&A and Final reports for repaired parts",
     builders: [VANES_NOZZLES, BUCKETS_BLADES],
   },

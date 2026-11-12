@@ -73,7 +73,7 @@ Two things will happen:
 
 Pick your line of business, then your report builder:
 
-- **Parts** → Vanes & Nozzles, or Buckets & Blades
+- **Repair** → Vanes & Nozzles, or Buckets & Blades
 - **Inspection** → ATS Borescope Report Builder, or ATS Report Reviewer
 
 Then pick your job folder like normal and work through the report.

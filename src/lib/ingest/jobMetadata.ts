@@ -85,16 +85,31 @@ const BLANK: Omit<JobMetadata, "jobNumber" | "customer" | "part" | "quantity" | 
 };
 
 /** A turbine model/frame token as it appears in V&N job folder names: GE frames (F7EA, F7FA, 7FA,
- * F6B, F5LA, F7B), Siemens/Westinghouse (W501D5A, 501F, D5A, V84), Alstom (GT11D5, GT24). */
-const MODEL_TOKEN = /^(F?[5-9][A-Z]{1,3}(\.\d+)?|W?501[A-Z0-9]*|D5A?|V\d{2}(\.\d)?|GT\d{2}[A-Z0-9]*)$/i;
+ * F6B, F5LA, F7B, and the bare frames F3/F5, FR9EA, F7C-E), Siemens/Westinghouse (W501D5A, 501F,
+ * MHI501F, D5A, V84, W251B11, W251AA), Alstom (GT11D5, GT24, GT8C, Liburdi's "11N2"). Bare "GT2"
+ * is a unit, not a model -- only GT8 is a one-digit Alstom frame. */
+const MODEL_TOKEN =
+  /^(FR?[3-9][A-Z]{1,3}(-[A-Z])?(\.\d+)?|[5-9][A-Z]{1,3}(\.\d+)?|FR?[3-9]|(MHI)?W?501[A-Z0-9]*|W?251[A-Z][A-Z0-9]*|D5A?|V\d{2}(\.\d)?|GT\d{2}[A-Z0-9]*|GT8[A-Z]?|11N[A-Z0-9]?)$/i;
 /** Unit/plant designators that sit between the customer and the model ("ZN-GT2", "SP-GTB",
  * "HM-GT2", "CT6", "DCT13", "GBY-82", "BCT-03", "UNIT 73") -- pulled out into the cover's Unit field
  * rather than left in the customer name. */
 const UNIT_TOKEN = /^(([A-Z]{1,3}-)?GT[\dA-Z]{1,2}|D?CT\d+|U\d+|[A-Z]{2,4}-\d{1,3})$/i;
 
+/** "1ST STAGE NOZZLE" → "1st Stage Nozzle"; codes with digits stay as written ("CM2", "R1-6"). */
 function titleCase(s: string): string {
-  return s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase()).replace(/\b(\d+)(St|Nd|Rd|Th)\b/g, (_, n, suf) => n + suf.toLowerCase());
+  return s
+    .split(/(\s+)/)
+    .map((w) => {
+      if (/^\d+(st|nd|rd|th)$/i.test(w)) return w.toLowerCase();
+      if (/\d/.test(w)) return w.toUpperCase();
+      return w.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase());
+    })
+    .join("");
 }
+
+/** A plant unit written after the model ("V84.2 YK-CT3 COMPRESSOR DIFFUSER", "W501F HM-GT1 ROW 2
+ * RING SEGMENTS") -- the unit, not part of the part's name. */
+const UNIT_AFTER_MODEL = /^[A-Z]{1,3}-(GT|CT)[\dA-Z]{1,3}$/i;
 
 const KEEP_UPPER = new Set(["GE", "APG", "TBC", "PO", "NDT", "MHI", "DLN", "LLC", "UT", "FS", "SRP", "TVA", "NRG", "AEP", "PGE", "APS", "TEP", "FMPA", "PSE", "LP", "CT", "GT"]);
 
@@ -121,9 +136,12 @@ function reportCase(s: string): string {
  * from it on; quantity only when a "(QTY n)" suffix is present. */
 export function parseJobMetadataFromFolderName(jobRoot: string): JobMetadata {
   const folderName = path.basename(jobRoot);
-  const match = folderName.match(/^(\d{4,6})\s+(.+?)\s*(\(QTY\s*(\d+)\))?(\s+EQ\s*#?\s*\d+)?\s*$/i);
+  const match = folderName.trim().match(/^(\d{4,6}(?:-\d{1,2})?)\s+(.+?)\s*(\(QTY\.?\s*(\d+)\.?\))?(\s+EQ\s*#?\s*\d+)?\s*$/i);
   if (!match) return { jobNumber: "", customer: "", part: folderName, quantity: "", ...BLANK, sources: ["folder name"] };
-  const [, jobNumber, description, , quantity = ""] = match;
+  const [, jobNumber, rawDescription, , quantity = ""] = match;
+  // An asset number or its placeholder mid-name ("ISOS - EQ# 10403457", "EQ#PENDING", "EQ TBD")
+  // isn't part of the part, nor is the dash left hanging before it.
+  const description = rawDescription.replace(/\s*-?\s*\bEQ\s*[#-]?\s*(\d{5,}|PENDING|TBD)\b/gi, " ").replace(/[\s\u2013-]+$/, "");
   const assetNumber = folderName.match(/\bEQ\s*#?\s*(\d{5,})/i)?.[1] ?? "";
   const words = description.trim().split(/\s+/);
   let modelIdx = words.findIndex((w) => MODEL_TOKEN.test(w));
@@ -147,7 +165,13 @@ export function parseJobMetadataFromFolderName(jobRoot: string): JobMetadata {
     return true;
   });
 
-  const partWords = modelIdx >= 0 ? words.slice(modelIdx) : words.slice(1);
+  const partWords = (modelIdx >= 0 ? words.slice(modelIdx) : words.slice(1)).filter((w, i) => {
+    if (i > 0 && UNIT_AFTER_MODEL.test(w)) {
+      unitParts.push(w);
+      return false;
+    }
+    return true;
+  });
   const turbineModel = modelIdx < 0 ? "" : mhi ? `MHI ${words[modelIdx + 1].toUpperCase()}` : words[modelIdx].toUpperCase();
   return {
     jobNumber,
@@ -205,9 +229,10 @@ async function readRouterAlloy(absolutePath: string): Promise<string> {
 
 function inferTurbineOEM(turbineModel: string): string {
   const m = turbineModel.trim();
-  if (/^F?[5-9][A-Z]/i.test(m)) return "GE";
-  if (/^(W?501|D5|V\d{2})/i.test(m)) return "Siemens / Westinghouse";
-  if (/^GT\d{2}/i.test(m)) return "Alstom";
+  if (/^(FR?[3-9]|[5-9][A-Z])/i.test(m)) return "GE";
+  if (/^MHI/i.test(m)) return "Mitsubishi";
+  if (/^(W?501|W?251|D5|V\d{2})/i.test(m)) return "Siemens / Westinghouse";
+  if (/^(GT\d|11N)/i.test(m)) return "Alstom";
   return "";
 }
 

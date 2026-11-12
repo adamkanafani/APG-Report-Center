@@ -333,6 +333,22 @@ export async function autoDraftJob(scan: JobScanResult, template: ReportTemplate
       fields.material = prior.coverFields["Material"];
       changed = true;
     }
+    // Coating is the product's, like material: the last same-product report's coating was this
+    // job's in 71 of 93 past jobs checked (Working Jobs 16000-21600).
+    if (!fields.coating && !scan.metadata.coating && prior.coverValues?.coating) {
+      fields.coating = prior.coverValues.coating!;
+      changed = true;
+    }
+    // Hours / starts / prior repairs are this unit's own -- carried over only when the last report
+    // wrote a standing answer rather than a figure ("See RDS sheet", "Not Provided", "--"): the
+    // same as this job's in ~3 of 4 past jobs checked, and never a wrong number.
+    for (const key of ["hours", "starts", "priorRepair"] as const) {
+      const value = prior.coverValues?.[key];
+      if (!fields[key] && !scan.metadata[key] && value && !/\d/.test(value)) {
+        fields[key] = value;
+        changed = true;
+      }
+    }
     if (changed) jobs.push(["cover", { fields }]);
   }
 

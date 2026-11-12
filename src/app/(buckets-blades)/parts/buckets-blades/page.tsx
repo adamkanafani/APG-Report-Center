@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePartName } from "@/lib/usePartName";
 import type { JobScanResult, SectionScanResult } from "@/bucketsBlades/lib/ingest/scanJobFolder";
 import type { JobFile } from "@/bucketsBlades/lib/ingest/fileWalk";
 import { COVER_FIELD_ORDER } from "@/bucketsBlades/lib/ingest/jobMetadata";
@@ -26,16 +27,22 @@ const REPORT_TYPE_OPTIONS: Array<{ id: ReportTypeId; label: string; description:
   },
 ];
 
+/** The part picked on the Repair screen ("Buckets", "Blades") above "Report Builder", else the
+ * builder's own name. */
+function PartEyebrow() {
+  return <span className="app-wordmark-eyebrow">{usePartName("Buckets & Blades")}</span>;
+}
+
 function ReportTypePicker({ onChosen }: { onChosen: (id: ReportTypeId) => void }) {
   return (
     <div className="folder-picker">
-      <a className="home-link" href="/">
-        ← Report Center
+      <a className="home-link" href="/repair">
+        ← Repair
       </a>
       <div className="app-logo">
         <AppLogoMark />
         <div className="app-wordmark">
-          <span className="app-wordmark-eyebrow">Buckets &amp; Blades</span>
+          <PartEyebrow />
           <h1>Report Builder</h1>
         </div>
       </div>
@@ -205,7 +212,7 @@ function FolderPicker({ onJobFolderChosen, onBack }: { onJobFolderChosen: (path:
       <div className="app-logo">
         <AppLogoMark />
         <div className="app-wordmark">
-          <span className="app-wordmark-eyebrow">Buckets &amp; Blades</span>
+          <PartEyebrow />
           <h1>Report Builder</h1>
         </div>
       </div>
@@ -1540,7 +1547,7 @@ export default function Home() {
         <div className="app-logo">
           <AppLogoMark animated={loading} />
           <div className="app-wordmark">
-            <span className="app-wordmark-eyebrow">Buckets &amp; Blades</span>
+            <PartEyebrow />
             <h1>Report Builder</h1>
           </div>
         </div>

@@ -8,6 +8,7 @@ import type { SectionState } from "@/lib/state/jobState";
 import { effectiveMultiSelection, isExcluded } from "@/lib/state/selection";
 import { PhotoPagePicker } from "./PhotoPagePicker";
 import { RichTextEditor } from "./RichTextEditor";
+import { usePartName } from "@/lib/usePartName";
 
 type SectionWithState = SectionScanResult & { state: SectionState };
 type ScanResponse = Omit<JobScanResult, "sections"> & { sections: SectionWithState[]; sectionOrder?: string[] };
@@ -32,8 +33,8 @@ const REPORT_TYPE_OPTIONS: Array<{ id: ReportTypeId; label: string; description:
 function ReportTypePicker({ onChosen }: { onChosen: (id: ReportTypeId) => void }) {
   return (
     <div className="folder-picker">
-      <a className="home-link" href="/">
-        ← Report Center
+      <a className="home-link" href="/repair">
+        ← Repair
       </a>
       <div className="app-logo">
         <AppLogoMark />
@@ -117,9 +118,11 @@ function AppLogoMark({ animated }: { animated?: boolean }) {
 /** "Report Builder" wordmark with the service-line eyebrow above it -- the one visible branding
  * difference from the Tech Rep (buckets/blades) app this shell is shared with. */
 function AppWordmark() {
+  // The part picked on the Repair screen ("Compressor Diaphragms"), else the builder's own name.
+  const partName = usePartName("Vanes & Nozzles");
   return (
     <div className="app-wordmark">
-      <span className="app-wordmark-eyebrow">Vanes &amp; Nozzles</span>
+      <span className="app-wordmark-eyebrow">{partName}</span>
       <h1>Report Builder</h1>
     </div>
   );

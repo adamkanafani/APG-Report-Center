@@ -7,17 +7,20 @@ export type Builder = { name: string; covers: string; href?: string };
 export type Theme = "apg" | "ats";
 export type Lob = { id: string; name: string; blurb: string; theme: Theme; builders: Builder[]; note?: string };
 
-const VANES_NOZZLES: Builder = {
-  name: "Vanes & Nozzles",
-  covers: "Nozzles, vanes, compressor diaphragms, blade rings, ISOs, air seals, support rings",
-  href: "/parts/vanes-nozzles",
-};
-
-const BUCKETS_BLADES: Builder = {
-  name: "Buckets & Blades",
-  covers: "Turbine buckets and compressor blades",
-  href: "/parts/buckets-blades",
-};
+// Repair gets one button per part, so a tech picks what's on the bench; each opens the builder
+// made for it -- Vanes & Nozzles or Buckets & Blades.
+const VANES_NOZZLES = "/parts/vanes-nozzles";
+const BUCKETS_BLADES = "/parts/buckets-blades";
+const REPAIR_PARTS: Builder[] = [
+  { name: "Nozzles", covers: "Turbine nozzles, every stage", href: VANES_NOZZLES },
+  { name: "Vanes", covers: "Turbine vanes, every row", href: VANES_NOZZLES },
+  { name: "Buckets", covers: "Turbine buckets", href: BUCKETS_BLADES },
+  { name: "Blades", covers: "Compressor blades", href: BUCKETS_BLADES },
+  { name: "Compressor Diaphragms", covers: "Diaphragms, stators and seal holders", href: VANES_NOZZLES },
+  { name: "Blade Rings", covers: "Blade rings and ring segments", href: VANES_NOZZLES },
+  { name: "ISOs & Air Seals", covers: "Isolation segments and seal housings", href: VANES_NOZZLES },
+  { name: "Support Rings & Carriers", covers: "Inner support rings and vane carriers", href: VANES_NOZZLES },
+];
 
 export const LOBS: Lob[] = [
   {
@@ -25,7 +28,7 @@ export const LOBS: Lob[] = [
     theme: "apg",
     name: "Repair",
     blurb: "I&A and Final reports for repaired parts",
-    builders: [VANES_NOZZLES, BUCKETS_BLADES],
+    builders: REPAIR_PARTS,
   },
   {
     id: "field-service",

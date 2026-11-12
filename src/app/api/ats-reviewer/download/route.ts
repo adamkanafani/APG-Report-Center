@@ -1,10 +1,10 @@
-import { lockedResponse } from "@/atsReviewer/lib/pinLock";
+import { requireReviewer } from "@/atsReviewer/lib/reviewerAuth";
 import { NextRequest } from "next/server";
 import { getJob } from "@/atsReviewer/lib/jobs";
 
 export async function GET(request: NextRequest) {
-  const locked = lockedResponse(request);
-  if (locked) return locked;
+  const auth = requireReviewer(request);
+  if (auth instanceof Response) return auth;
   const jobId = request.nextUrl.searchParams.get("jobId");
   const job = jobId ? getJob(jobId) : undefined;
   if (!job) {

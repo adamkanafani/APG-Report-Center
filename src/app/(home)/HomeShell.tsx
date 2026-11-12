@@ -4,7 +4,7 @@ import type { Theme } from "./lobs";
 
 /** The logo lockup and backdrop every Report Center screen shares. The tiles carry each line's own
  * look (APG blue, ATS black-and-red). A line's own screen takes over the Report Center's blue
- * backdrop as it opens (BackdropShift): ATS red floods in for Inspection, a steel scan for Parts. */
+ * backdrop as it opens (BackdropShift): ATS red floods in for Inspection; Parts has no animation. */
 export function HomeShell({ subtitle, back, theme = "apg", entrance, children }: { subtitle: string; back?: { href: string; label: string }; theme?: Theme; entrance?: Entrance; children: ReactNode }) {
   return (
     <div className={`folder-picker home home-${theme}${entrance ? " home-entrance" : ""}`}>

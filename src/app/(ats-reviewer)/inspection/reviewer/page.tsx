@@ -1,10 +1,17 @@
 import { cookies } from "next/headers";
-import { isUnlocked, pinConfigured, UNLOCK_COOKIE } from "@/atsReviewer/lib/pinLock";
+import { reviewersConfigured, SESSION_COOKIE, signedInUser } from "@/atsReviewer/lib/reviewerAuth";
 import { PinGate } from "./PinGate";
 import ReviewerApp from "./ReviewerApp";
+import { SignedInBadge } from "./SignedInBadge";
 
-/** The Reviewer opens only for a browser that has entered the reviewer PIN (see pinLock.ts). */
+/** The Reviewer opens only for a signed-in reviewer (see reviewerAuth.ts). */
 export default async function ReviewerPage() {
-  const unlocked = isUnlocked((await cookies()).get(UNLOCK_COOKIE)?.value);
-  return unlocked ? <ReviewerApp /> : <PinGate configured={pinConfigured()} />;
+  const user = signedInUser((await cookies()).get(SESSION_COOKIE)?.value);
+  if (!user) return <PinGate configured={reviewersConfigured()} />;
+  return (
+    <>
+      <ReviewerApp />
+      <SignedInBadge user={user} />
+    </>
+  );
 }

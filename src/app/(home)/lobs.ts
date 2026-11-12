@@ -41,7 +41,7 @@ export const LOBS: Lob[] = [
     blurb: "ATS borescope reports",
     builders: [
       { name: "ATS Borescope Report Builder", covers: "Builds the ATS borescope report from the raw borescope file", href: "/inspection/borescope" },
-      { name: "ATS Report Reviewer", covers: "Report reviewer only. Checks an inspector's ATS report before it goes out (PIN required)", href: "/inspection/reviewer" },
+      { name: "ATS Report Reviewer", covers: "Report reviewer only. Checks an inspector's ATS report before it goes out (sign-in required)", href: "/inspection/reviewer" },
     ],
   },
   {

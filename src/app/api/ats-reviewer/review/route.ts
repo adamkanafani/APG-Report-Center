@@ -1,9 +1,9 @@
-import { lockedResponse } from "@/atsReviewer/lib/pinLock";
+import { logUsage, requireReviewer } from "@/atsReviewer/lib/reviewerAuth";
 import { NextRequest } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
 import { runReview } from "@/atsReviewer/lib/review/pipeline";
-import { hasApiKey, mapLimit } from "@/atsReviewer/lib/review/ai";
+import { estimatedCostUsd, hasApiKey, mapLimit, withAiUsage, type AiUsage } from "@/atsReviewer/lib/review/ai";
 import { addComparisonComments, compareReports, CompareFinding, extractFromDocx, findingsToItems } from "@/atsReviewer/lib/review/compare";
 import { DEFAULT_OPTIONS, ProgressEvent, ReviewCategory, ReviewOptions, ReviewResult } from "@/atsReviewer/lib/review/types";
 import { saveJob } from "@/atsReviewer/lib/jobs";
@@ -24,8 +24,8 @@ interface Input {
  *  carries each report's change log and download id -- plus, for several reports of the same
  *  unit, the cross-report comparison. */
 export async function POST(request: NextRequest) {
-  const locked = lockedResponse(request);
-  if (locked) return locked;
+  const auth = requireReviewer(request);
+  if (auth instanceof Response) return auth;
   const form = await request.formData();
   const optionsRaw = form.get("options");
 
@@ -56,6 +56,11 @@ export async function POST(request: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       const send = (event: ProgressEvent) => controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
+      // Every Claude call in this review counts against the signed-in reviewer (logged below).
+      const usage: AiUsage = { user: auth.user, calls: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0 };
+      const started = Date.now();
+      let outcome = "done";
+      await withAiUsage(usage, async () => {
       try {
         // Cross-report comparison runs alongside the reviews -- it only needs the original files.
         let comparison: ReviewCategory | null = null;
@@ -144,10 +149,24 @@ export async function POST(request: NextRequest) {
         send({ type: "done", results, comparison });
       } catch (err) {
         console.error("review failed:", err);
+        outcome = `failed: ${err instanceof Error ? err.message : err}`;
         send({ type: "error", message: err instanceof Error ? err.message : "The review failed." });
       } finally {
         controller.close();
       }
+      });
+      await logUsage({
+        event: "review",
+        user: auth.user,
+        reports: inputs.map((i) => i.name),
+        outcome,
+        seconds: Math.round((Date.now() - started) / 1000),
+        aiCalls: usage.calls,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        cacheReadTokens: usage.cacheReadTokens,
+        estimatedCostUsd: estimatedCostUsd(usage),
+      });
     },
   });
 

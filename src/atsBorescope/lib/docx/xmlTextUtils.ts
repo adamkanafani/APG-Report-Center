@@ -113,8 +113,15 @@ export function findPrecedingPageBreakStart(xml: string, beforePos: number): num
   return findParagraphStart(xml, breakIdx + 1);
 }
 
-/** The report's photos heading (Heading1): "Photos" in most ATS templates, "Unit Photos" in some
- *  (RB211). */
+/** The report's photos heading: a Heading1 "Photos" in most ATS templates, "Unit Photos" (RB211) or
+ *  "General Photos" (V84.2/V84.3) in some, and a Heading2 "Photos" at the end of the Observations
+ *  section in the aeroderivative ones (LM2500, LM5000, LMS100, Allison 501, FT4) -- the photo
+ *  sections are the Heading2s after it either way. */
 export function findPhotosHeading(xml: string, fromIndex = 0): { paragraphStart: number; paragraphEnd: number } | null {
-  return findHeadingParagraph(xml, "Heading1", "Photos", fromIndex) ?? findHeadingParagraph(xml, "Heading1", "Unit Photos", fromIndex);
+  return (
+    findHeadingParagraph(xml, "Heading1", "Photos", fromIndex) ??
+    findHeadingParagraph(xml, "Heading1", "Unit Photos", fromIndex) ??
+    findHeadingParagraph(xml, "Heading1", "General Photos", fromIndex) ??
+    findHeadingParagraph(xml, "Heading2", "Photos", fromIndex)
+  );
 }

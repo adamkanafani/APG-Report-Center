@@ -1074,31 +1074,50 @@ button.report-tab.active {
   text-decoration: underline;
 }
 
-/* Reviewer PIN screen (PinGate.tsx). */
+/* Reviewer sign-in screen (PinGate.tsx) and the signed-in badge (SignedInBadge.tsx). */
 .pin-gate {
-  max-width: 460px;
+  max-width: 480px;
 }
 
-.pin-form {
+.signin-form {
   display: flex;
+  flex-direction: column;
   gap: 10px;
-  align-items: center;
+  align-items: stretch;
 }
 
-.pin-input {
-  width: 190px;
+.signin-input {
   padding: 10px 14px;
   border-radius: 8px;
   border: 1px solid rgba(224, 70, 77, 0.45);
   background: #161616;
   color: #ffffff;
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 22px;
-  letter-spacing: 0.45em;
-  text-align: center;
+  font-size: 16px;
+  letter-spacing: 0.04em;
 }
 
-.pin-input:focus {
+.signin-input:focus {
   outline: 2px solid #d4636b;
   outline-offset: 2px;
+}
+
+.signed-in-badge {
+  position: fixed;
+  left: 16px;
+  bottom: 14px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 6px 14px;
+  border-radius: 999px;
+  background: rgba(13, 13, 13, 0.9);
+  border: 1px solid rgba(224, 70, 77, 0.45);
+  color: #d9d9d9;
+  font-size: 13px;
+}
+
+.signed-in-badge button {
+  padding: 4px 12px;
+  font-size: 12px;
 }

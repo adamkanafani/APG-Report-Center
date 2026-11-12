@@ -18,6 +18,8 @@ function compressorRowKeys(component: string): string[] {
   if ((m = c.match(/exit guide vane\s*(\d+)/))) return [`EGV${m[1]}`];
   if (/exit guide vane|\begv\b/.test(c)) return ["EGV"];
   if (/outlet guide vane|\bogv\b/.test(c)) return ["OGV"];
+  // Siemens V84: VLA = compressor blade row, VLE = compressor vane row ("VLA Row 1" -> table row "VLA 1").
+  if ((m = c.match(/\bvl([ae])\s*(?:row)?\s*(\d+)/))) return [`VL${m[1].toUpperCase()}${m[2]}`];
   if ((m = c.match(/(?:stage|row|\br)\s*-?\s*(\d+)\s+(?:rotor\s+)?blade/))) return [`R${m[1]}`, `R${m[1]}B`, `ROW${m[1]}BLADES`, `STAGE${m[1]}BLADES`];
   if ((m = c.match(/(?:stage|row|\bs)\s*-?\s*(\d+)\s+(?:stator\s+vane|stator|diaphragm|vane)/))) return [`S${m[1]}`, `R${m[1]}D`, `ROW${m[1]}VANES`, `STAGE${m[1]}VANES`];
   return [];
@@ -29,6 +31,9 @@ const turbineGroup = (word: string): TurbineGroup | null =>
 
 /** A turbine photo's "stage:group" key, e.g. "Turbine Row 1 Blade" -> "1:blade", "Stage 2 Nozzle" -> "2:vane". */
 function turbineKey(component: string): string | null {
+  // Siemens V84: TLE = turbine vane row, TLA = turbine blade row ("Turbine TLE Row 4").
+  const v84 = component.match(/\btl([ae])\s*(?:row)?\s*(\d+)/i);
+  if (v84) return `${v84[2]}:${v84[1].toLowerCase() === "e" ? "vane" : "blade"}`;
   const m = component.match(/(?:stage|row)\s*(\d+).*?(nozzle|vane|bucket|blade|shroud|ring segment|honeycomb)/i);
   if (!m) return null;
   const g = turbineGroup(m[2]);
@@ -93,7 +98,7 @@ export function fillObservationsGeneric(documentXml: string, units: RawPhotoUnit
         const cells = findCellsInRange(xml, rows[r].start, rows[r].end);
         if (cells.length === 0) continue;
         const first = extractText(xml, cells[0].start, cells[0].end);
-        const anchor = first.match(/^(?:Stage|Row)\s*(\d+)\s+(.+)$/i);
+        const anchor = first.match(/^(?:Stage|Row|TL[AE])\s*(\d+)\s+(.+)$/i); // "Row 1 Vanes", V84 "TLE 1 Vanes"
         if (anchor && cells.length === 1) {
           const g = turbineGroup(anchor[2]);
           current = g ? `${anchor[1]}:${g}` : null;

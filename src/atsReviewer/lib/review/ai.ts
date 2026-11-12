@@ -5,6 +5,8 @@
  * document structure directly.
  */
 import Anthropic from "@anthropic-ai/sdk";
+import { AsyncLocalStorage } from "async_hooks";
+import { apiUserId } from "../reviewerAuth";
 
 export const REVIEW_MODEL = "claude-opus-5-5";
 
@@ -21,6 +23,29 @@ function getClient(): Anthropic {
 
 type Effort = "low" | "medium" | "high";
 
+/** The signed-in reviewer a review runs for, and the AI tokens it has used so far -- every call
+ *  below adds to it and tags the request with that reviewer's opaque id (metadata.user_id), so
+ *  each reviewer's usage is on record (see reviewerAuth.ts's usage log). */
+export interface AiUsage {
+  user: string;
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+}
+const usageContext = new AsyncLocalStorage<AiUsage>();
+
+/** Runs `fn` with every Claude call inside it counted against `usage`. */
+export function withAiUsage<T>(usage: AiUsage, fn: () => Promise<T>): Promise<T> {
+  return usageContext.run(usage, fn);
+}
+
+/** Claude Opus 5.5 list prices, for the usage log's rough cost: $4 / $20 per million input / output
+ *  tokens, cache reads $0.20. */
+export function estimatedCostUsd(u: AiUsage): number {
+  return Math.round(((u.inputTokens * 4 + u.outputTokens * 20 + u.cacheReadTokens * 0.2) / 1_000_000) * 100) / 100;
+}
+
 async function finalMessage(system: string, user: string, schema: Record<string, unknown>, effort: Effort) {
   const params = {
     model: REVIEW_MODEL,
@@ -29,6 +54,7 @@ async function finalMessage(system: string, user: string, schema: Record<string,
     output_config: { effort, format: { type: "json_schema" as const, schema } },
     system,
     messages: [{ role: "user" as const, content: user }],
+    ...(usageContext.getStore() ? { metadata: { user_id: apiUserId(usageContext.getStore()!.user) } } : {}),
   };
   try {
     // Server-side refusal fallback: if a safety classifier misfires on turbine-damage
@@ -59,6 +85,13 @@ export async function callStructured<T>(system: string, user: string, schema: Re
     if (err instanceof Anthropic.RateLimitError) throw new Error("The Anthropic API rate limit was hit -- wait a minute and run the review again.");
     if (err instanceof Anthropic.APIConnectionError) throw new Error("Couldn't reach the Anthropic API -- check this computer's internet connection.");
     throw err;
+  }
+  const usage = usageContext.getStore();
+  if (usage) {
+    usage.calls++;
+    usage.inputTokens += message.usage.input_tokens ?? 0;
+    usage.outputTokens += message.usage.output_tokens ?? 0;
+    usage.cacheReadTokens += message.usage.cache_read_input_tokens ?? 0;
   }
   if (message.stop_reason === "refusal") throw new Error("The AI declined to review this part of the report.");
   if (message.stop_reason === "max_tokens") throw new Error("The AI response was cut off (report section too long).");

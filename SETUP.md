@@ -123,21 +123,27 @@ delete the old folder.
   to PDF for you when the report is built; without it, they're listed as
   skipped so you can print them yourself.
 
-## The report reviewer only: the ATS Report Reviewer
+## Report reviewers only: the ATS Report Reviewer
 
-The ATS Report Reviewer is for one person, the report reviewer. Its checks
-use Claude AI, which is paid per report, so it opens only with the
-reviewer's 6-digit PIN. Everyone else sees it locked; skip this section on
-their computers.
+The ATS Report Reviewer is for the report reviewers only. Its checks use
+Claude AI, which is paid per report, so each reviewer signs in with their own
+user name and password, and every review is recorded under the person who ran
+it. Everyone else sees it locked; skip this section on their computers.
 
-On the report reviewer's computer only, after setup:
+On a reviewer's computer only, after setup:
 
 1. Close the app's server window if it's open.
-2. Double-click **`Set Reviewer PIN.bat`** in the app folder.
+2. Double-click **`Set Reviewer Users.bat`** in the app folder.
 3. Paste the **Anthropic API key** and press Enter.
-4. Type the **reviewer PIN**, press Enter, and type it again.
-5. Start the app again with **`Start Report Center.bat`**.
+4. For each reviewer: type their **user name**, then their **password** twice.
+   Press Enter with no user name when done.
+5. Start the app again from the desktop icon.
 
-The PIN is never saved as-is: a scrambled copy goes in a file called
-`.env.local` in the app folder, which never leaves the computer. Run
-`Set Reviewer PIN.bat` again any time the key or PIN changes.
+Passwords are never saved as-is: a scrambled copy of each goes in a file
+called `.env.local` in the app folder, which never leaves the computer. Run
+`Set Reviewer Users.bat` again to add a reviewer or change a password.
+
+Each sign-in, sign-out and review is logged on that computer in
+`%LOCALAPPDATA%\APGReportCenter\ats-reviewer-usage.jsonl` (paste that into
+File Explorer's address bar to find it): who, when, which reports, and how
+much AI each review used.

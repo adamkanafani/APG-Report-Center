@@ -2,26 +2,28 @@
 
 import { useState } from "react";
 
-/** The PIN screen in front of the ATS Report Reviewer (its AI checks cost money per report). */
+/** The sign-in screen in front of the ATS Report Reviewer: its AI checks are paid per report, so
+ *  only its named reviewers can open it, each under their own user name. */
 export function PinGate({ configured }: { configured: boolean }) {
-  const [pin, setPin] = useState("");
+  const [user, setUser] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
 
-  async function unlock(e: React.FormEvent) {
+  async function signIn(e: React.FormEvent) {
     e.preventDefault();
-    if (pin.length !== 6) return;
+    if (!user.trim() || !password) return;
     setChecking(true);
     setError(null);
     try {
-      const res = await fetch("/api/ats-reviewer/unlock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin }) });
+      const res = await fetch("/api/ats-reviewer/signin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user, password }) });
       if (res.ok) {
         window.location.reload();
         return;
       }
       const body = await res.json().catch(() => ({}));
-      setError(body.error ?? "Couldn't check the PIN.");
-      setPin("");
+      setError(body.error ?? "Couldn't sign in.");
+      setPassword("");
     } catch {
       setError("Couldn't reach the app. Is the Report Center still running?");
     } finally {
@@ -40,30 +42,34 @@ export function PinGate({ configured }: { configured: boolean }) {
         </div>
         {configured ? (
           <>
-            <p className="folder-picker-subtitle">For the report reviewer only. Its AI checks are paid per report, so it opens with the reviewer&apos;s 6-digit PIN.</p>
-            <form onSubmit={unlock} className="pin-form">
+            <p className="folder-picker-subtitle">For the report reviewers only. Its AI checks are paid per report, so sign in with your own reviewer user name and password -- every review is recorded under it.</p>
+            <form onSubmit={signIn} className="signin-form">
               <input
-                className="pin-input"
-                type="password"
-                inputMode="numeric"
-                autoComplete="off"
+                className="signin-input"
+                autoComplete="username"
                 autoFocus
-                maxLength={6}
-                placeholder="••••••"
-                aria-label="Reviewer PIN"
-                value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="User name"
+                aria-label="User name"
+                value={user}
+                onChange={(e) => setUser(e.target.value.toUpperCase())}
               />
-              <button type="submit" disabled={pin.length !== 6 || checking}>
-                {checking ? "Checking..." : "Unlock"}
+              <input
+                className="signin-input"
+                type="password"
+                autoComplete="current-password"
+                placeholder="Password"
+                aria-label="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <button type="submit" disabled={!user.trim() || !password || checking}>
+                {checking ? "Checking..." : "Sign in"}
               </button>
             </form>
             {error && <p className="folder-picker-error">{error}</p>}
           </>
         ) : (
-          <p className="folder-picker-subtitle">
-            The ATS Report Reviewer is for the report reviewer only and isn&apos;t set up on this computer.
-          </p>
+          <p className="folder-picker-subtitle">The ATS Report Reviewer is for the report reviewers only and isn&apos;t set up on this computer.</p>
         )}
       </div>
     </div>

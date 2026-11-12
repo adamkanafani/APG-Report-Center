@@ -1,7 +1,7 @@
 import { findHeadingParagraph, findPhotosHeading } from "./xmlTextUtils";
 import type { PhotosSection } from "./photosSectionMap";
 import { buildGenericFamily } from "./genericFamily";
-import type { SectionKind } from "./sectionKinds";
+import { componentKind, KIND_FALLBACKS, sectionKind, type SectionKind } from "./sectionKinds";
 
 /**
  * One Photos subsection this family's templates *can* have. Most are `required`: every
@@ -105,7 +105,9 @@ const STANDARD_RULES: Rule[] = [
     ],
   },
   { section: "Turbine Section", keywords: ["Nozzle", "Bucket", "Shroud"] },
-  { section: "Compressor Section", keywords: ["Rotor Blade", "Stator Vane", "Guide Vane", "Compressor Case", "EGV", "Dovetail"] },
+  // "Inlet Guide" too: some captions shorten "Variable Inlet Guide Vanes" to "Variable Inlet Guide",
+  // which the Inlet rule below would otherwise take.
+  { section: "Compressor Section", keywords: ["Rotor Blade", "Stator Vane", "Guide Vane", "Inlet Guide", "Compressor Case", "EGV", "Dovetail"] },
   { section: "Exhaust Section", keywords: ["Exhaust", "Flex Seal", "Strut", "Barrel", "Diffuser"] },
   { section: "Inlet Section", keywords: ["Bellmouth", "Inlet", "Floor"] },
 ];
@@ -171,7 +173,7 @@ export const FRAME_STANDARD_FAMILY: TemplateFamily = {
  *     and no real 9FA raw sample has been checked yet to know whether they should be split out.
  */
 const BEARING_RULES: Rule[] = [
-  { section: "Variable Inlet Guide Vanes", keywords: ["Variable Inlet Guide Vane"] },
+  { section: "Variable Inlet Guide Vanes", keywords: ["Variable Inlet Guide"] },
   { section: "Number One Bearing Area", keywords: ["Number 1 Bearing"] },
   { section: "Combustion Section Cold Side", keywords: ["Cold Side"] },
   {
@@ -299,5 +301,30 @@ export function resolveClassify(family: TemplateFamily, resolvedSections: Set<Ph
  * (genericFamily.ts) -- which is how every other model ATS inspects is handled.
  */
 export function familyForTemplate(documentXml: string): TemplateFamily | null {
-  return detectTemplateFamily(documentXml) ?? buildGenericFamily(documentXml);
+  const ge = detectTemplateFamily(documentXml);
+  if (!ge) return buildGenericFamily(documentXml);
+  // A template that has every GE section but more besides (LM2500's "Power Turbine Section", the
+  // V84s' "Data Plate") is read from its own headings instead: the GE layout doesn't know the extra
+  // section, so building with it would run the section before it straight over the top of it.
+  const generic = buildGenericFamily(documentXml);
+  const known = new Set(ge.photosSubsectionSpecs.map((s) => s.section));
+  if (generic && generic.photosSubsectionSpecs.some((s) => !known.has(s.section))) return generic;
+  // The GE rules are hand-checked against full GE setups; for the short names some older setups
+  // use ("Compressor", "Turbine Stage 1", "Forward Compressor", "Generator") they find nothing, so
+  // those fall back to the general rules (sectionKinds.ts), mapped onto this family's own sections.
+  const sections = ge.photosSubsectionSpecs.map((s) => s.section);
+  return {
+    ...ge,
+    classify: (component: string) => {
+      const own = ge.classify(component);
+      if (own) return own;
+      const kind = componentKind(component);
+      if (!kind) return null;
+      for (const k of [kind, ...KIND_FALLBACKS[kind]]) {
+        const match = sections.find((s) => sectionKind(s) === k);
+        if (match) return match;
+      }
+      return null;
+    },
+  };
 }

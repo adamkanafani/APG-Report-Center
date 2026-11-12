@@ -29,12 +29,16 @@ load, so one builder's CSS never reaches another's pages. Both builders' saved s
 old standalone apps kept it, so reviews in progress carry over.
 
 The ATS Report Reviewer needs `ANTHROPIC_API_KEY` in `.env.local` for its AI checks, and opens only
-with the 6-digit reviewer PIN, since those checks are paid per report. `Set Reviewer PIN.bat`
-(`scripts/set-reviewer-pin.mjs`, run only on the report reviewer's computer) writes the key and a salted scrypt hash of the PIN
-(`ATS_REVIEWER_PIN_HASH`) to `.env.local`; the PIN itself is never stored, and never belongs in this
-public repo. `src/atsReviewer/lib/pinLock.ts` checks it: the right PIN sets a signed, httpOnly cookie
-good for 12 hours, every Reviewer API route refuses without it, and wrong guesses slow to one per 30
-seconds after five. The ATS apps' test scripts and sample reports stayed in
+for its named reviewers, each signing in with their own user name and password, since those checks
+are paid per report. `Set Reviewer Users.bat` (`scripts/set-reviewer-users.mjs`, run only on the
+reviewers' computers) writes the key and a salted scrypt hash of each password (`ATS_REVIEWER_USERS`)
+to `.env.local`; passwords are never stored, and never belong in this public repo.
+`src/atsReviewer/lib/reviewerAuth.ts` checks them: a right sign-in sets a signed, httpOnly cookie
+naming the user, good for 12 hours; every Reviewer API route refuses without it; wrong guesses slow to
+one per 30 seconds after five. Every sign-in (good or bad), sign-out and review is appended to
+`%LOCALAPPDATA%\APGReportCenter\ats-reviewer-usage.jsonl` on that computer -- who, when, which reports,
+and each review's AI calls, tokens and estimated cost -- and each Claude request carries the
+reviewer's opaque id as `metadata.user_id`. The ATS apps' test scripts and sample reports stayed in
 their old repos (ATS-Borescope-Report-App, ATS-Report-Reviewer): the samples are customer reports and
 this repo is public.
 
@@ -53,6 +57,15 @@ The builder fills any model's blank ATS template, not just GE frames:
 - **Observations.** Compressor and turbine Condition cells are filled for any template whose rows it
   recognizes (GE "R1/S1", Westinghouse/Siemens "R1B/R1D", "Row N Vanes/Blades/Ring Segment"), in ATS's
   wording: "Impact damage at the leading edge (1)".
+- **Checked against ATS's own Inspection Center** (2026-11-12): every model's blank Cover Page template
+  is recognized (GE 6B/6FA/7B-7C/7EA/7FA/7HA/9FA/Frame 5/GE10; Westinghouse 191/251/501AA/501B/501D5A/
+  501F/501G; Mitsubishi 501G/501GAC/501J/701F; Siemens SGT-800/SGT6-5000F/V84.2/V84.3; Alstom GT24;
+  ABB 11N; LM2500/LM5000/LM6000/LMS100; Allison 501; Avon 200; RB211; Trent 60; FT4/FT8/GG4;
+  generators; steam), and every component in each model's borescope setup sorts into a section --
+  except a generic steam setup's bare "Stage N"/"Valve N" and Avon's "Intermediate Pressure Section",
+  which the tech places. A test report per model, built from one of its past reports' captions,
+  matches ATS's own placement 98-100% (ABB 11N and LM6000 lower only where finished reports renamed
+  photos the borescope names plainly) and fills its Observations tables.
 - **Templates.** Found in the Inspection Center (OEM/Model/Cover Page) when it's synced, the
   ATS Cover Page Templates folder, a folder picked with "Choose templates folder...", or a plugged-in
   drive, and matched to the raw file's unit (e.g. `501D5A_...docx` finds "501D5 _501D5A").

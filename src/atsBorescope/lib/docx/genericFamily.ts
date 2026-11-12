@@ -34,7 +34,8 @@ export function buildGenericFamily(documentXml: string): TemplateFamily | null {
   if (!photos) return null;
   // To the body's own closing section properties -- not the first <w:sectPr> after Photos, which can
   // be a mid-document section break (a landscape page) with more Photos headings after it.
-  const headings = listHeadings(documentXml, "Heading2", photos.paragraphStart, documentXml.length);
+  // From the end of the photos heading itself, which is a Heading2 in some templates.
+  const headings = listHeadings(documentXml, "Heading2", photos.paragraphEnd, documentXml.length);
   // The same heading text twice would collapse in the assembler's lookup -- keep the first.
   const seen = new Set<string>();
   const sections = headings.map((h) => h.text).filter((t) => !seen.has(t) && seen.add(t));
@@ -89,6 +90,8 @@ const QUALIFIERS: Array<[RegExp, string]> = [
   [/\b(ip|ipc|ipt|intermediate pressure|intermediate)\b/, "intermediate"],
   [/\b(lp|lpc|lpt|low pressure|low)\b/, "low"],
   [/\bpower turbine\b|\bpt\b/, "power"],
+  [/\bfree turbine\b|\bft\b/, "free"],
+  [/\bgas generator\b|\bgg\b/, "gas-generator"],
   [/\bexciter\b|\bcollector\b/, "exciter"],
   [/\bturbine end\b|\bte\b/, "turbine-end"],
 ];

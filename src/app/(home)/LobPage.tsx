@@ -8,7 +8,7 @@ export function LobPage({ id }: { id: string }) {
   const lob = lobById(id);
   if (!lob) notFound();
   return (
-    <HomeShell subtitle={`${lob.name}: which report are you building?`} back={{ href: "/", label: "All lines of business" }} theme={lob.theme} entrance={lob.theme === "ats" ? "flood" : "scan"}>
+    <HomeShell subtitle={`${lob.name}: which report are you building?`} back={{ href: "/", label: "All lines of business" }} theme={lob.theme} entrance={lob.theme === "ats" ? "flood" : undefined}>
       <div className="lob-grid">
         {lob.builders.map((b) =>
           b.href ? (

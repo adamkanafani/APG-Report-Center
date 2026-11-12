@@ -61,10 +61,7 @@ export function assembleReport(template: LoadedDocx, units: RawPhotoUnit[], opti
 
   // The GE families' own proven filler; every other model's template gets the generic one, which
   // reads the template's own tables (observationsGeneric.ts).
-  const observationsResult =
-    family.id === "generic"
-      ? fillObservationsGeneric(template.documentXml, units)
-      : fillObservations(template.documentXml, aggregateObservations(units, family.classify));
+  const observationsResult = fillObservationsFor(family, template.documentXml, units);
   const xml = observationsResult.documentXml;
 
   const photosHeading = findPhotosHeading(xml, 0);
@@ -165,4 +162,16 @@ export function assembleReport(template: LoadedDocx, units: RawPhotoUnit[], opti
     observationsFilled: observationsResult.filled,
     observationsSkipped: observationsResult.skipped,
   };
+}
+
+/** The GE families' own proven filler, or the generic one (observationsGeneric.ts) for every other
+ *  template -- and for a template whose photo layout looks GE but whose Observations tables are laid
+ *  out differently (the V84s), rather than failing the whole report over the tables. */
+function fillObservationsFor(family: TemplateFamily, documentXml: string, units: RawPhotoUnit[]) {
+  if (family.id === "generic") return fillObservationsGeneric(documentXml, units);
+  try {
+    return fillObservations(documentXml, aggregateObservations(units, family.classify));
+  } catch {
+    return fillObservationsGeneric(documentXml, units);
+  }
 }

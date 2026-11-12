@@ -1,4 +1,4 @@
-import { lockedResponse } from "@/atsReviewer/lib/pinLock";
+import { requireReviewer } from "@/atsReviewer/lib/reviewerAuth";
 import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
@@ -112,8 +112,8 @@ function matchesExtension(name: string, extensions: string[]): boolean {
 }
 
 export async function GET(request: NextRequest) {
-  const locked = lockedResponse(request);
-  if (locked) return locked;
+  const auth = requireReviewer(request);
+  if (auth instanceof Response) return auth;
   const dirParam = request.nextUrl.searchParams.get("dir");
   const extParam = request.nextUrl.searchParams.get("ext");
   const extensions = extParam ? extParam.split(",").map((e) => e.trim().toLowerCase()) : [];

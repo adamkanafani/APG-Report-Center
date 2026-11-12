@@ -50,9 +50,16 @@ export function turbineRowKey(component: string): { stage: number; group: Turbin
   return null;
 }
 
+/** "IMPACT Damage" -> "Impact damage", keeping abbreviations and row labels as written
+ *  ("R4D impact damage", "TBC loss", "IGV deposits"). */
 const sentenceCase = (s: string) => {
-  const t = s.trim().replace(/\s+/g, " ");
-  return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase().replace(/\bo'clock\b|\bo’clock\b/g, "o’clock");
+  const words = s.trim().replace(/\s+/g, " ").split(" ");
+  const out = words.map((w, i) => {
+    if (/^[A-Z0-9-]{2,}$/.test(w) && /[A-Z]/.test(w) && (/\d/.test(w) || w.length <= 4)) return w; // R4D, IGV, TBC
+    const lower = w.toLowerCase().replace(/^o['’]clock$/, "o’clock");
+    return i === 0 ? lower.charAt(0).toUpperCase() + lower.slice(1) : lower;
+  });
+  return out.join(" ");
 };
 
 /**

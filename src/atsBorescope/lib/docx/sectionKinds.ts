@@ -24,7 +24,10 @@ export type SectionKind =
  *  own (Operational Data, Data Plate, one-off TIL sections, ...). */
 export function sectionKind(heading: string): SectionKind {
   const h = heading.toLowerCase().replace(/\s+/g, " ");
-  if (/generator|exciter/.test(h)) return "generator";
+  // Nameplate photos ("Data Plate", FT8's "Power Turbine Data Plate") aren't an inspection area.
+  if (/data plate|nameplate|name plate/.test(h)) return "other";
+  // An aeroderivative's "gas generator" is its core engine, not an electrical generator.
+  if (/generator|exciter/.test(h) && !/gas generator/.test(h)) return "generator";
   if (/bearing/.test(h)) return "bearing";
   if (/variable inlet guide|\bvigv\b|\bigv\b|inlet guide vane/.test(h)) return "vigv";
   if (/\binlet\b|\bintake\b/.test(h)) return "inlet";
@@ -32,8 +35,8 @@ export function sectionKind(heading: string): SectionKind {
   if (/(combust|burner|chamber|annul).*cold|cold side/.test(h)) return "combustion-cold";
   if (/(combust|burner|chamber|annul).*hot|hot side/.test(h)) return "combustion-hot";
   if (/combust|burner|chamber|annular/.test(h)) return "combustion";
+  if (/exhaust|diffuser/.test(h)) return "exhaust"; // before turbine: "Power Turbine Exhaust Case"
   if (/turbine|\bhpt\b|\blpt\b|power turbine/.test(h)) return "turbine";
-  if (/exhaust|diffuser/.test(h)) return "exhaust";
   return "other";
 }
 
@@ -50,16 +53,36 @@ const norm = (s: string) =>
  *  aeroderivative "HPC/LPT", ...). Turbine is checked before compressor for names that say
  *  "Turbine" outright, since "Turbine Row 1 Blade" would otherwise look like a compressor blade. */
 const RULES: Array<{ kind: SectionKind; pattern: RegExp }> = [
-  { kind: "generator", pattern: /generator|exciter|end winding|collector ring|retaining ring/ },
+  { kind: "generator", pattern: /(?<!gas )generator|exciter|end winding|collector ring|retaining ring/ },
+  // Exhaust named outright wins, so "GG Exhaust Case"/"PT Exhaust Case" aren't read as turbine parts
+  // ("exhuast" is a real typo in ATS's FT8 setup).
+  { kind: "exhaust", pattern: /exhaust|exhuast/ },
+  // Siemens V84 abbreviations: VLA/VLE compressor blades/vanes, TLA/TLE turbine blades/vanes,
+  // BK1/BK2 the two silo combustors.
+  { kind: "compressor", pattern: /\bvl[ae]\b/ },
+  { kind: "turbine", pattern: /\btl[ae]\b/ },
+  { kind: "combustion-hot", pattern: /\bbk ?\d\b/ },
+  // The V84s' two silo combustors, as ATS captions them ("Left Side", "Right Side") -- the whole name only.
+  { kind: "combustion-hot", pattern: /^(left|right) (side|silo|combustor)$/ },
+  // V84 silo-combustor liner parts, as captioned without their BK1/BK2 prefix.
+  { kind: "combustion-hot", pattern: /fuel piping|nox water ring|water ring|bezel ring|\bf ring\b|mixer tile|tile clip|tile support|pin support|upstream pin|downstream pin|burner cap|^(upper |lower )?elbow( upper| lower)?$/ },
+  // Inlet-side water wash and fogging nozzles (before the turbine rule takes any "nozzle").
+  { kind: "inlet", pattern: /water wash|fogging/ },
   { kind: "vigv", pattern: /variable inlet guide vane|\bvigv\b|\bigv\b|inlet guide vane/ },
   { kind: "bearing", pattern: /number (1|one) bearing|no 1 bearing|#1 bearing/ },
   { kind: "turbine", pattern: /\bturbine\b|\bhpt\b|\blpt\b|power turbine/ },
-  { kind: "inlet", pattern: /\binlet\b(?!.*guide)|\bintake\b|bellmouth|\bfloor\b|silencer|inlet filter/ },
-  { kind: "compressor", pattern: /rotor blade|stator vane|diaphragm|compressor|\begv\b|exit guide vane|outlet guide vane|\bogv\b|\bhpc\b|\blpc\b|dovetail|\bigv\b/ },
+  { kind: "inlet", pattern: /\binlet\b(?!.*guide)|\bintake\b|bellmouth|\bfloor\b|silencer|inlet filter|splitter plate/ },
   {
+    kind: "compressor",
+    pattern: /rotor blade|stator vane|diaphragm|compressor|\begv\b|exit guide vane|outlet guide vane|\bogv\b|\bhpc\b|\blpc\b|dovetail|\bigv\b|wear button|bleed air/,
+  },
+  {
+    // Westinghouse/Siemens cold-side parts come from ATS's own 501D5A borescope setup and where
+    // Brett's D5A reports filed them: the basket-to-transition clamp, transition mounting bracket,
+    // Madonna hat and crossflame tube weld are seen from outside, in the cold-side group.
     kind: "combustion-cold",
     pattern:
-      /cold side|combustion casing|\bcdc\b|quaternary|outer (aft )?mount(ing)? bracket|outer zipper weld|bull ?horn|spool bolt|impingement sleeve|basket clamp|forward mounting bracket|aft mounting bracket/,
+      /cold side|combustion casing|\bcdc\b|quaternary|outer (aft )?mount(ing)? bracket|outer zipper weld|bull ?horn|spool bolt|impingement sleeve|basket clamp|forward mounting bracket|aft mounting bracket|basket to transition|transition mounting|madonna hat|crossflame tube weld|\bt lug\b|\brca\b|rotor cooling air|\bbracket\b/,
   },
   {
     kind: "combustion-hot",

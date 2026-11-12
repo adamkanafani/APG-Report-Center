@@ -1,19 +1,5 @@
 @echo off
-title APG Report Center - Launcher
-echo Starting APG Report Center...
-echo.
-echo A new window will open running the app - leave THAT window open while you
-echo work (you can minimize it). Your browser will open automatically in a
-echo few seconds. This window will close on its own.
-echo.
-if not exist ".next" (
-  echo It looks like setup hasn't been run yet on this computer.
-  echo Please double-click "Setup - Run This First.bat" first.
-  echo.
-  pause
-  exit /b 1
-)
-start "APG Report Center - Server (leave this open)" cmd /k "npm run start -- -p 3002"
-timeout /t 5 /nobreak >nul
-start "" http://localhost:3002
-exit
+rem Starts the APG Report Center, updating it first when there's a new version (scripts\launch.cmd).
+rem Runs a copy of the launcher from %TEMP% and hands over to it for good (no "call"), so an update
+rem that rewrites this folder -- this file included -- can't disturb the script that's running.
+copy /y "%~dp0scripts\launch.cmd" "%TEMP%\apg-report-center-launch.cmd" >nul & "%TEMP%\apg-report-center-launch.cmd" "%~dp0."

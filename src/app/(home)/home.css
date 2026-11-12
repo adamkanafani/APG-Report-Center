@@ -341,8 +341,8 @@
   }
 }
 
-/* Parts: a scan beam sweeps down the page like a part going through inspection, leaving brushed
-   steel blue behind it and uncovering the APG spire in the bottom-right corner as it passes. */
+/* Parts: brushed-steel blue sweeps down the page from the top, uncovering the APG spire in the
+   bottom-right corner as it passes. */
 .backdrop-scan {
   position: fixed;
   inset: 0;
@@ -354,20 +354,6 @@
     linear-gradient(135deg, #061f4d 0%, #0b3d91 30%, #3f74bd 62%, #8fb3df 85%, #d3e2f4 100%);
   clip-path: inset(0 0 0 0);
   animation: backdrop-scan 1.1s cubic-bezier(0.65, 0, 0.35, 1) 0.15s both;
-}
-
-.backdrop-scan-beam {
-  position: fixed;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 2px;
-  z-index: -1;
-  pointer-events: none;
-  background: linear-gradient(to right, transparent, #ffffff 15%, #ffffff 85%, transparent);
-  box-shadow: 0 0 18px 4px rgba(157, 194, 236, 0.9), 0 0 60px 14px rgba(111, 163, 224, 0.55);
-  opacity: 0;
-  animation: backdrop-scan-beam 1.1s cubic-bezier(0.65, 0, 0.35, 1) 0.15s both;
 }
 
 .backdrop-spire {
@@ -392,25 +378,10 @@
   }
 }
 
-@keyframes backdrop-scan-beam {
-  0% {
-    top: 0;
-    opacity: 1;
-  }
-  85% {
-    opacity: 1;
-  }
-  100% {
-    top: 100vh;
-    opacity: 0;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .backdrop-shift,
   .backdrop-shift-ring,
   .backdrop-scan,
-  .backdrop-scan-beam,
   .backdrop-spire {
     animation: none;
   }

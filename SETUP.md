@@ -85,10 +85,15 @@ Center** (the one with the APG spire) → **Show more options** → **Send to** 
 
 ## Getting updates
 
-Whenever there's a new version of the app, double-click **`Update.bat`**
-inside the app folder. It downloads the changes and rebuilds automatically.
-This does **not** affect any reports you've already started reviewing —
-your saved progress lives outside this folder and is untouched.
+Updates install themselves. Each time you open the Report Center from the
+desktop icon, it checks for a new version; if there is one, an **"Updating"**
+window opens for a minute or two and the app starts on its own when it's
+done. With no internet it just opens the version you have.
+
+You can also update by hand: close the app's server window and double-click
+**`Update.bat`** inside the app folder. Either way, updates do **not** affect
+any reports you've already started reviewing — your saved progress lives
+outside this folder and is untouched.
 
 ## Coming from one of the old report builders
 

@@ -8,8 +8,8 @@ export type Entrance = "flood" | "scan";
 /** How a line's screen takes over the Report Center's blue backdrop as it opens.
  * - "flood" (Inspection, an ATS line): ATS red floods out from where its tile was clicked, led by a
  *   white shock ring.
- * - "scan" (Parts): a scan beam sweeps down the page, leaving a brushed-steel blue behind it, and
- *   the beam uncovers the APG spire in the bottom-right corner as it passes.
+ * - "scan" (Parts): a brushed-steel blue sweeps down the page from the top, uncovering the APG
+ *   spire in the bottom-right corner as it passes.
  * Shown only after mount, so the flood starts from the click spot rather than a default and then
  * jumping. */
 export function BackdropShift({ entrance }: { entrance: Entrance }) {
@@ -32,7 +32,6 @@ export function BackdropShift({ entrance }: { entrance: Entrance }) {
     return (
       <>
         <div className="backdrop-scan" aria-hidden="true" />
-        <div className="backdrop-scan-beam" aria-hidden="true" />
         <div className="backdrop-spire" aria-hidden="true" />
       </>
     );

@@ -133,6 +133,22 @@
   transform: translateY(calc(-50% - 10px)) scale(1.1);
 }
 
+/* Repair's part buttons: a line drawing of the part (public/repair-icons) in place of the APG
+   mark -- inside the edge rather than cropped by it, and a little stronger than the solid spire
+   since it's only thin lines. Hover keeps the spire's white lift. */
+.home .lob-tile.theme-apg.has-icon::after {
+  background-image: var(--tile-mark);
+  right: 10px;
+  width: 80px;
+  height: 80px;
+  opacity: 0.38;
+}
+
+.home .lob-tile.theme-apg.has-icon:not(.soon):hover::after {
+  opacity: 0.6;
+  transform: translateY(calc(-50% - 4px)) scale(1.08);
+}
+
 @keyframes apg-glint {
   from {
     background-position: 100% 0, 0 0;

@@ -270,7 +270,45 @@ function applyPercentCells({ model, log }: FormattingContext) {
 
 // --- Photo tables: Times New Roman 12, standard 3.2" photo height ---
 
-function applyPhotoTables({ model, log }: FormattingContext) {
+// The caption rows every photo has; anything else in a caption table is a measurement row
+// ("Point-to-Line", "Measurement Plane", "Depth", ...) the borescope software adds.
+const CORE_CAPTION_LABELS = new Set(["section", "component", "location", "observation", "classification", "comments", "comment", "serial number"]);
+/** "--" (what the borescope writes for no value), dashes or blank. */
+const NO_VALUE = /^[\s\-–—.]*$/;
+
+/** Brett's rule: a measurement row with no measurement in it ("Measurement Plane: --") is deleted
+ *  from the photo's caption table, as an inspector would by hand. Rows it removes are dropped from
+ *  the model too, so nothing later (the AI passes) reads them. */
+function removeEmptyMeasurementRows({ model, log }: FormattingContext) {
+  const removed = new Set<Element>();
+  const labels = new Map<string, number>();
+  for (const p of model.paragraphs) {
+    const t = p.table;
+    if (t?.kind !== "photo" || !t.nested || !t.rowLabel || removed.has(t.row)) continue;
+    if (CORE_CAPTION_LABELS.has(t.rowLabel)) continue;
+    const cells = elementChildren(t.row).filter((c) => c.tagName === "w:tc");
+    if (cells.length < 2) continue;
+    const value = cells
+      .slice(1)
+      .map((c) => descendants(c, "w:t").map((x) => x.textContent ?? "").join(""))
+      .join("");
+    if (!NO_VALUE.test(value)) continue;
+    removed.add(t.row);
+    const label = descendants(cells[0], "w:t").map((x) => x.textContent ?? "").join("").replace(/\s+/g, " ").trim();
+    labels.set(label, (labels.get(label) ?? 0) + 1);
+  }
+  if (removed.size === 0) return;
+  for (const row of removed) row.parentNode?.removeChild(row);
+  model.paragraphs = model.paragraphs.filter((p) => !(p.table && removed.has(p.table.row)));
+  const what = [...labels].map(([label, n]) => `${n} "${label}"`).join(", ");
+  log.add("photos", {
+    note: `Removed ${removed.size} empty measurement row${removed.size === 1 ? "" : "s"} from photo tables (${what}).`,
+  });
+}
+
+function applyPhotoTables(ctx: FormattingContext) {
+  removeEmptyMeasurementRows(ctx);
+  const { model, log } = ctx;
   let runs = 0;
   for (const p of model.paragraphs) {
     if (p.table?.kind !== "photo") continue;

@@ -46,7 +46,10 @@ export function estimatedCostUsd(u: AiUsage): number {
   return Math.round(((u.inputTokens * 4 + u.outputTokens * 20 + u.cacheReadTokens * 0.2) / 1_000_000) * 100) / 100;
 }
 
-async function finalMessage(system: string, user: string, schema: Record<string, unknown>, effort: Effort) {
+/** The user turn: plain text, or content blocks (text + images) for the photo date-stamp check. */
+export type UserContent = string | Anthropic.Beta.BetaContentBlockParam[];
+
+async function finalMessage(system: string, user: UserContent, schema: Record<string, unknown>, effort: Effort) {
   const params = {
     model: REVIEW_MODEL,
     max_tokens: 64000,
@@ -73,7 +76,7 @@ async function finalMessage(system: string, user: string, schema: Record<string,
 }
 
 /** One structured-output Claude call: system + user text in, schema-validated JSON out. */
-export async function callStructured<T>(system: string, user: string, schema: Record<string, unknown>, effort: Effort): Promise<T> {
+export async function callStructured<T>(system: string, user: UserContent, schema: Record<string, unknown>, effort: Effort): Promise<T> {
   let message;
   try {
     message = await finalMessage(system, user, schema, effort);
@@ -139,6 +142,7 @@ const EDIT_RULES = `Editing rules:
 - Tokens like ⟦1⟧ stand for fields, links, or dropdowns. Keep every one exactly as written, in the same order.
 - Keep tabs and the existing spacing between sentences as they are.
 - Leave "Typical", "No defects identified", and template labels (Component, Location, Observation, Comments) unchanged.
+- Leave ATS's standard section headings exactly as written, including their established punctuation ("Applicable TIL’s", "Documentation & Photographs", "Significant Observations and Recommendations").
 - Leave placeholder text such as X, XX, 20XX, or "Choose an item." unchanged -- the reviewer handles those.`;
 
 // --- 1. Proofreading ---

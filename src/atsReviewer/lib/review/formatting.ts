@@ -25,6 +25,7 @@ import {
   TBLPR_ORDER,
 } from "../docx/ooxml";
 import { DocModel, locationLabel, normalizeHeading, ParaInfo, PHOTO_CAPTION_LABELS, refreshHeadingContext } from "./model";
+import { cleanPhotoCaptions } from "./captions";
 import { applyPhotoSectionLayout, HeaderFooterRel } from "./layout";
 import type { ReviewLog } from "./report";
 import type { ReviewOptions } from "./types";
@@ -82,6 +83,7 @@ export function applyFormatting(ctx: FormattingContext): { hasToc: boolean } {
     applyPercentCells(ctx);
   }
   if (options.photoTables) {
+    cleanPhotoCaptions(ctx.model, ctx.log);
     applyPhotoTables(ctx);
     applyPhotoSectionLayout(ctx.documentXml, ctx.model, ctx.log, ctx.headerFooterRels ?? []);
   }
@@ -284,8 +286,10 @@ function removeEmptyMeasurementRows({ model, log }: FormattingContext) {
   const labels = new Map<string, number>();
   for (const p of model.paragraphs) {
     const t = p.table;
-    if (t?.kind !== "photo" || !t.nested || !t.rowLabel || removed.has(t.row)) continue;
+    if (t?.kind !== "photo" || !t.rowLabel || removed.has(t.row)) continue;
     if (CORE_CAPTION_LABELS.has(t.rowLabel)) continue;
+    // Never a row that holds the photo itself (a caption laid out in the photo table's own rows).
+    if (descendants(t.row, "w:drawing").length > 0 || descendants(t.row, "w:pict").length > 0) continue;
     const cells = elementChildren(t.row).filter((c) => c.tagName === "w:tc");
     if (cells.length < 2) continue;
     const value = cells

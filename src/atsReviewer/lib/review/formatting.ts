@@ -275,6 +275,8 @@ function applyPercentCells({ model, log }: FormattingContext) {
 // The caption rows every photo has; anything else in a caption table is a measurement row
 // ("Point-to-Line", "Measurement Plane", "Depth", ...) the borescope software adds.
 const CORE_CAPTION_LABELS = new Set(["section", "component", "location", "observation", "classification", "comments", "comment", "serial number"]);
+// Measurement rows are named for what they measure ("Point-to-Line", "Measurement Plane", "Depth").
+const MEASUREMENT_LABEL = /measure|plane|point|line|depth|length|width|gap|distance|height|thickness|diameter|radius|angle|area/;
 /** "--" (what the borescope writes for no value), dashes or blank. */
 const NO_VALUE = /^[\s\-–—.]*$/;
 
@@ -288,6 +290,10 @@ function removeEmptyMeasurementRows({ model, log }: FormattingContext) {
     const t = p.table;
     if (t?.kind !== "photo" || !t.rowLabel || removed.has(t.row)) continue;
     if (CORE_CAPTION_LABELS.has(t.rowLabel)) continue;
+    if (!MEASUREMENT_LABEL.test(t.rowLabel)) continue;
+    // Operational data / data plate tables hold readings, where "--" means "not recorded" -- keep them.
+    const table = model.photoTables.find((x) => x.topTbl === t.topTbl);
+    if (table?.isOperationalData || table?.isDataPlate) continue;
     // Never a row that holds the photo itself (a caption laid out in the photo table's own rows).
     if (descendants(t.row, "w:drawing").length > 0 || descendants(t.row, "w:pict").length > 0) continue;
     const cells = elementChildren(t.row).filter((c) => c.tagName === "w:tc");

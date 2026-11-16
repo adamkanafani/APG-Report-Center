@@ -156,17 +156,32 @@ function parseCaptionTable(captionTable: Element): ParsedCaption | null {
 
   const measurements: Measurement[] = [];
   for (let i = 2; i < observationIndex; i++) {
-    const value = textOf(cellAt(rows[i], 1));
+    const value = valueOf(cellAt(rows[i], 1));
     if (labels[i]) measurements.push({ label: labels[i], value });
   }
 
   return {
-    component: textOf(cellAt(rows[0], 1)) || null,
-    location: textOf(cellAt(rows[1], 1)) || null,
+    component: valueOf(cellAt(rows[0], 1)) || null,
+    location: valueOf(cellAt(rows[1], 1)) || null,
     measurements,
-    observation: textOf(cellAt(rows[observationIndex], 1)) || null,
-    comments: textOf(cellAt(rows[lastIndex], 1)) || null,
+    observation: valueOf(cellAt(rows[observationIndex], 1)) || null,
+    comments: valueOf(cellAt(rows[lastIndex], 1)) || null,
   };
+}
+
+/** A caption value. The MDI software writes each value picked from a list as its own line (a row
+ *  of a small table inside the cell) -- two observations picked for one photo are "Coating Loss"
+ *  and "Material Loss" on separate lines, which run together as "Coating LossMaterial Loss" when
+ *  read as one string (SHGP 7EA, Nov 2026). Lines are joined with ", " instead. */
+function valueOf(cell: Element | null): string {
+  if (!cell) return "";
+  const paragraphs = cell.getElementsByTagName("w:p");
+  const lines: string[] = [];
+  for (let i = 0; i < paragraphs.length; i++) {
+    const line = textOf(paragraphs[i] as unknown as Element);
+    if (line) lines.push(line);
+  }
+  return lines.length ? lines.join(", ") : textOf(cell);
 }
 
 /**

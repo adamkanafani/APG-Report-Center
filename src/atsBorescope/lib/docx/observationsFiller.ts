@@ -1,5 +1,6 @@
 import { findHeadingParagraph, findRowsInRange, findCellsInRange, extractText, findPhotosHeading } from "./xmlTextUtils";
 import type { ObservationsAggregation } from "./observationsAggregator";
+import { fillCombustionTable } from "./combustionObservations";
 
 export interface FillObservationsResult {
   documentXml: string;
@@ -44,8 +45,8 @@ export function replaceAddApplicablePlaceholder(documentXml: string, obsHeadingS
 }
 
 /**
- * Fills the Compressor and Turbine Observations tables' Condition cells from `aggregation`
- * (see observationsAggregator.ts). Deliberately does not touch Combustion, Exhaust, or any
+ * Fills the Compressor, Combustion (combustionObservations.ts) and Turbine Observations tables'
+ * Condition cells from `aggregation` (see observationsAggregator.ts). Deliberately does not touch Exhaust, or any
  * Percent-Inspected cell -- see the plan file for why those aren't reliable to auto-fill from
  * this raw data; Percent-Inspected cells keep whichever default value the template itself
  * already shipped with (these vary per row -- not a single constant -- and a couple are literal
@@ -131,6 +132,20 @@ export function fillObservations(documentXml: string, aggregation: ObservationsA
   }
 
   for (const key of turbineByKey.keys()) skipped.push(`Stage ${key.replace(":", " ")}`);
+
+  // ---- Combustion: per-position tables, cold side then hot side (combustionObservations.ts). ----
+  if (aggregation.combustion?.size) {
+    const hotHeading = findHeadingParagraph(xml, "Heading2", "Combustion Section Hot Side", combustionHeading.paragraphStart);
+    const coldEnd = hotHeading ? hotHeading.paragraphStart : turbineHeading.paragraphStart;
+    const cold = fillCombustionTable(xml, combustionHeading.paragraphStart, coldEnd, "cold", aggregation.combustion);
+    edits.push(...cold.edits);
+    filled.push(...cold.filled.map((f) => `Cold side ${f}`));
+    if (hotHeading) {
+      const hot = fillCombustionTable(xml, hotHeading.paragraphStart, turbineHeading.paragraphStart, "hot", aggregation.combustion);
+      edits.push(...hot.edits);
+      filled.push(...hot.filled.map((f) => `Hot side ${f}`));
+    }
+  }
 
   // Apply from the last edit backwards so earlier positions (computed against the original xml) stay valid.
   edits.sort((a, b) => b.start - a.start);

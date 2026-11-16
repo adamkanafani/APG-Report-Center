@@ -1,5 +1,6 @@
 import type { RawPhotoUnit } from "./rawMdiParser";
 import type { PhotosSection } from "./photosSectionMap";
+import { combustionFindings } from "./combustionObservations";
 
 export type TurbineGroup = "Nozzles" | "Buckets" | "Shroud Blocks";
 
@@ -13,6 +14,8 @@ export interface ObservationsAggregation {
   /** Row key (e.g. "R1", "S1", "VIGV", "EGV1") -> Condition text. */
   compressor: Map<string, string>;
   turbine: TurbineStageEntry[];
+  /** "side|position|row" ("hot|2|crossfire tube") -> condition text; see combustionObservations.ts. */
+  combustion: Map<string, string>;
   /** Units classified as Compressor/Turbine (by the same classifier the Photos step uses)
    *  whose component still didn't match a known Observations row -- a real gap worth
    *  surfacing, unlike Combustion/Exhaust/Inlet units, which are silently out of scope for
@@ -39,11 +42,14 @@ export function compressorRowKey(component: string): string | null {
   return null;
 }
 
-/** Maps a raw unit's `component` to a Turbine Observations stage/group, or null. */
-export function turbineRowKey(component: string): { stage: number; group: TurbineGroup } | null {
+/** Maps a raw unit's `component` to a Turbine Observations stage/group, or null. A bucket photo
+ *  whose location is the shroud ("Stage 1 Bucket" / "Shroud Block", SHGP 7EA) is a shroud finding:
+ *  the template has its own Stage N Shroud Blocks row for it. */
+export function turbineRowKey(component: string, location?: string | null): { stage: number; group: TurbineGroup } | null {
   let m = /^Stage (\d+) Nozzle$/.exec(component);
   if (m) return { stage: Number(m[1]), group: "Nozzles" };
   m = /^Stage (\d+) Bucket$/.exec(component);
+  if (m && /shroud block|honeycomb/i.test(location ?? "")) return { stage: Number(m[1]), group: "Shroud Blocks" };
   if (m) return { stage: Number(m[1]), group: "Buckets" };
   m = /^Stage (\d+) Shroud$/.exec(component);
   if (m) return { stage: Number(m[1]), group: "Shroud Blocks" };
@@ -77,12 +83,15 @@ export function aggregateConditionText(units: RawPhotoUnit[], options: { counts?
 
   const byObservation = new Map<string, { label: string; locations: string[]; count: number }>();
   for (const unit of nonTypical) {
-    const label = sentenceCase(unit.observation as string);
-    const key = label.toLowerCase();
-    const entry = byObservation.get(key) ?? byObservation.set(key, { label, locations: [], count: 0 }).get(key)!;
-    entry.count++;
-    const location = unit.location?.trim().replace(/\s+/g, " ").toLowerCase();
-    if (location && !entry.locations.includes(location)) entry.locations.push(location);
+    // Two values picked for one photo ("Crack, Erosion With Material Loss") are two findings.
+    for (const part of (unit.observation as string).split(/\s*,\s*/).filter((p) => p && !/^typical$/i.test(p))) {
+      const label = sentenceCase(part);
+      const key = label.toLowerCase();
+      const entry = byObservation.get(key) ?? byObservation.set(key, { label, locations: [], count: 0 }).get(key)!;
+      entry.count++;
+      const location = unit.location?.trim().replace(/\s+/g, " ").toLowerCase();
+      if (location && !entry.locations.includes(location)) entry.locations.push(location);
+    }
   }
 
   return [...byObservation.values()]
@@ -125,7 +134,7 @@ export function aggregateObservations(units: RawPhotoUnit[], classify: (componen
       compressorGroups.get(compressorKey)!.push(unit);
       continue;
     }
-    const turbine = turbineRowKey(unit.component);
+    const turbine = turbineRowKey(unit.component, unit.location);
     if (turbine) {
       const key = `${turbine.stage}:${turbine.group}`;
       if (!turbineGroups.has(key)) {
@@ -152,5 +161,5 @@ export function aggregateObservations(units: RawPhotoUnit[], classify: (componen
     turbine.push({ stage: meta.stage, group: meta.group, text: aggregateConditionText(groupUnits) });
   }
 
-  return { compressor, turbine, unmatched };
+  return { compressor, turbine, combustion: combustionFindings(units), unmatched };
 }

@@ -30,13 +30,15 @@ const turbineGroup = (word: string): TurbineGroup | null =>
   /nozzle|vane/i.test(word) ? "vane" : /bucket|blade/i.test(word) ? "blade" : /shroud|ring segment|honeycomb/i.test(word) ? "shroud" : null;
 
 /** A turbine photo's "stage:group" key, e.g. "Turbine Row 1 Blade" -> "1:blade", "Stage 2 Nozzle" -> "2:vane". */
-function turbineKey(component: string): string | null {
+function turbineKey(component: string, location?: string | null): string | null {
   // Siemens V84: TLE = turbine vane row, TLA = turbine blade row ("Turbine TLE Row 4").
   const v84 = component.match(/\btl([ae])\s*(?:row)?\s*(\d+)/i);
   if (v84) return `${v84[2]}:${v84[1].toLowerCase() === "e" ? "vane" : "blade"}`;
   const m = component.match(/(?:stage|row)\s*(\d+).*?(nozzle|vane|bucket|blade|shroud|ring segment|honeycomb)/i);
   if (!m) return null;
   const g = turbineGroup(m[2]);
+  // A bucket/blade photo taken at the shroud ("Stage 1 Bucket" / "Shroud Block") is a shroud finding.
+  if (g === "blade" && /shroud block|ring segment|honeycomb/i.test(location ?? "")) return `${m[1]}:shroud`;
   return g ? `${m[1]}:${g}` : null;
 }
 
@@ -63,7 +65,7 @@ export function fillObservationsGeneric(documentXml: string, units: RawPhotoUnit
     if (kind === "compressor" || kind === "vigv") {
       for (const k of compressorRowKeys(u.component)) (compressorUnits.get(k) ?? compressorUnits.set(k, []).get(k)!).push(u);
     } else if (kind === "turbine") {
-      const k = turbineKey(u.component);
+      const k = turbineKey(u.component, u.location);
       if (k) (turbineUnits.get(k) ?? turbineUnits.set(k, []).get(k)!).push(u);
     }
   }

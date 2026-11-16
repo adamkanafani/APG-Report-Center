@@ -55,7 +55,8 @@ rem old build, so rebuild it. A build from before this check existed is taken as
 set "HEAD_NOW="
 for /f %%h in ('git rev-parse HEAD 2^>nul') do set "HEAD_NOW=%%h"
 if not defined HEAD_NOW goto start
-if not exist ".next\BUILD_ID" goto start
+rem No build at all (a build that failed part-way leaves none): build it now.
+if not exist ".next\BUILD_ID" goto rebuildnow
 if not exist ".next\APG_COMMIT" (
   > ".next\APG_COMMIT" echo %HEAD_NOW%
   goto start
@@ -63,6 +64,8 @@ if not exist ".next\APG_COMMIT" (
 set "BUILT="
 set /p BUILT=<".next\APG_COMMIT"
 if "%BUILT%"=="%HEAD_NOW%" goto start
+
+:rebuildnow
 if "%APG_NO_START%"=="1" (
   call "%~f0" "%APP%" rebuild
 ) else (
@@ -121,6 +124,9 @@ echo.
 
 :build
 call npm install --no-fund --no-audit
+rem Leftovers from "npm run dev" (.next\dev) name pages that may no longer exist; the build's type
+rem check fails on them, and a build never needs them.
+if exist ".next\dev" rmdir /s /q ".next\dev"
 call npm run build
 if errorlevel 1 (
   echo.

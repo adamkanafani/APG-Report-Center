@@ -93,6 +93,9 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
+rem Leftovers from running the app with "npm run dev" (.next\dev) name pages that may no longer
+rem exist, and the build's type check fails on them -- they're never needed for a build.
+if exist ".next\dev" rmdir /s /q ".next\dev"
 call npm run build
 if errorlevel 1 (
   echo.

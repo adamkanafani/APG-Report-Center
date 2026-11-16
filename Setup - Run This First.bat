@@ -30,6 +30,8 @@ if errorlevel 1 (
 )
 echo.
 echo Building the app for first use...
+rem Leftovers from "npm run dev" (.next\dev) can name pages that no longer exist and fail the build.
+if exist ".next\dev" rmdir /s /q ".next\dev"
 call npm run build
 if errorlevel 1 (
   echo.

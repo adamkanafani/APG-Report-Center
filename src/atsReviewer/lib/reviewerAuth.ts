@@ -53,7 +53,8 @@ export function checkSignIn(userName: string, password: string): SignInCheck {
   const user = userName.trim().toUpperCase();
   const record = stored.users.get(user);
   // Hash even for an unknown user, so a wrong user name takes as long as a wrong password.
-  const given = scryptSync(String(password), record?.salt ?? Buffer.alloc(16), 32);
+  // Trimmed, as Set Reviewer Users saves it -- a stray space typed at sign-in isn't a wrong password.
+  const given = scryptSync(String(password).trim(), record?.salt ?? Buffer.alloc(16), 32);
   if (record && timingSafeEqual(given, record.hash)) {
     failures = 0;
     nextTryAt = 0;

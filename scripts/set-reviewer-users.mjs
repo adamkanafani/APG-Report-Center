@@ -44,12 +44,25 @@ const hashPassword = (password) => {
   return `scrypt:${salt.toString("hex")}:${scryptSync(password, salt, 32).toString("hex")}`;
 };
 
+// Written after every answer, so closing the window part-way never loses what was entered.
+const write = (lines) => writeFileSync(ENV_FILE, lines.join("\r\n") + "\r\n");
+const withUsers = (lines, users) =>
+  setVar(
+    setVar(lines, "ATS_REVIEWER_USERS", users.size ? [...users].map(([u, h]) => `${u}=${h}`).join(";") : null),
+    "ATS_REVIEWER_PIN_HASH", // the old single PIN, replaced by named users
+    null,
+  );
+
 try {
   let lines = readEnv();
   const hasKey = lines.some((line) => /^ANTHROPIC_API_KEY=\S+/.test(line));
   const keyPrompt = hasKey ? "Anthropic API key (press Enter to keep the one already saved): " : "Anthropic API key (press Enter to skip): ";
   const key = (await ask(keyPrompt)).trim();
-  if (key) lines = setVar(lines, "ANTHROPIC_API_KEY", key);
+  if (key) {
+    lines = setVar(lines, "ANTHROPIC_API_KEY", key);
+    write(lines);
+    console.log("  API key saved.");
+  }
 
   // Users already saved on this computer.
   const users = new Map();
@@ -80,12 +93,13 @@ try {
       continue;
     }
     users.set(user, hashPassword(password));
-    console.log(`  Saved ${user}.`);
+    lines = withUsers(lines, users);
+    write(lines);
+    console.log(`  Saved ${user}. Add another, or press Enter with no user name to finish.`);
   }
 
-  lines = setVar(lines, "ATS_REVIEWER_USERS", users.size ? [...users].map(([u, h]) => `${u}=${h}`).join(";") : null);
-  lines = setVar(lines, "ATS_REVIEWER_PIN_HASH", null); // the old single PIN, replaced by named users
-  writeFileSync(ENV_FILE, lines.join("\r\n") + "\r\n");
+  lines = withUsers(lines, users);
+  write(lines);
   console.log(`Saved. Reviewers on this computer: ${[...users.keys()].join(", ") || "(none)"}`);
   console.log("If the Report Center is running, close its server window and start it again.");
 } finally {

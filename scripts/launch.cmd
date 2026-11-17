@@ -55,8 +55,12 @@ rem old build, so rebuild it. A build from before this check existed is taken as
 set "HEAD_NOW="
 for /f %%h in ('git rev-parse HEAD 2^>nul') do set "HEAD_NOW=%%h"
 if not defined HEAD_NOW goto start
-rem No build at all (a build that failed part-way leaves none): build it now.
+rem No build at all (a build that failed part-way leaves none), or one missing a file the server
+rem needs to start (OneDrive syncing the app folder has removed .next\prerender-manifest.json,
+rem and the server then crashed on start with nothing on screen): build it now.
 if not exist ".next\BUILD_ID" goto rebuildnow
+if not exist ".next\prerender-manifest.json" goto rebuildnow
+if not exist ".next\routes-manifest.json" goto rebuildnow
 if not exist ".next\APG_COMMIT" (
   > ".next\APG_COMMIT" echo %HEAD_NOW%
   goto start

@@ -46,6 +46,11 @@ function chunk<T>(items: T[], size: number): T[][] {
  * behavior), so photo preselection never depends on AI access being available. */
 async function classifyBatch(batch: JobFile[]): Promise<{ exclusions: PhotoExclusion[]; priorities: Map<string, PhotoPriority>; raw: string }> {
   const defaultPriorities = new Map<string, PhotoPriority>(batch.map((f) => [f.relativePath, "normal" as const]));
+  // No key, no screening -- checked before reading anything: each batch is 20 full-size photos off
+  // the network drive (a 800-photo job read ~260 MB just to be thrown away).
+  if (!process.env.ANTHROPIC_API_KEY?.trim()) {
+    return { exclusions: [], priorities: defaultPriorities, raw: "(skipped content-based screening: no API key)" };
+  }
   try {
     const imageBlocks = await Promise.all(
       batch.map(async (file) => {
@@ -140,9 +145,35 @@ function naturalCompare(a: string, b: string): number {
  * is a much better default grouping than leaving the two intermixed. */
 const UV_BRIGHTNESS_THRESHOLD = 75;
 
+/** The small preview most cameras embed in a JPEG's first few KB (EXIF thumbnail) -- enough to
+ *  judge overall brightness without reading and decoding the full multi-MB photo off the network
+ *  drive. Checked on 200 photos from Job 20564: 12x faster, and the same UV/work-light call on
+ *  every one that had a preview. Null when there's none (the full photo is used instead). */
+async function embeddedPreview(absolutePath: string): Promise<Buffer | null> {
+  if (!/\.jpe?g$/i.test(absolutePath)) return null;
+  let fh;
+  try {
+    fh = await fs.open(toLongPath(absolutePath), "r");
+    const buf = Buffer.alloc(65536);
+    const { bytesRead } = await fh.read(buf, 0, buf.length, 0);
+    const head = buf.subarray(0, bytesRead);
+    if (head[0] !== 0xff || head[1] !== 0xd8) return null;
+    const start = head.indexOf(Buffer.from([0xff, 0xd8, 0xff]), 2);
+    if (start < 0) return null;
+    const end = head.indexOf(Buffer.from([0xff, 0xd9]), start);
+    return end < 0 ? null : head.subarray(start, end + 2);
+  } catch {
+    return null;
+  } finally {
+    await fh?.close().catch(() => undefined);
+  }
+}
+
 async function isUvLit(absolutePath: string): Promise<boolean> {
   try {
-    const { data } = await sharp(toLongPath(absolutePath)).resize(32, 32, { fit: "fill" }).grayscale().raw().toBuffer({ resolveWithObject: true });
+    const preview = await embeddedPreview(absolutePath);
+    const source = preview ?? toLongPath(absolutePath);
+    const { data } = await sharp(source).resize(32, 32, { fit: "fill" }).grayscale().raw().toBuffer({ resolveWithObject: true });
     const mean = data.reduce((sum, v) => sum + v, 0) / data.length;
     return mean < UV_BRIGHTNESS_THRESHOLD;
   } catch {

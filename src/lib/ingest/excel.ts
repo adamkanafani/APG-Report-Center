@@ -1,5 +1,13 @@
+import { promises as fs } from "fs";
 import ExcelJS from "exceljs";
 import { toLongPath } from "../util/longPath";
+
+/** Workbooks already read in this server session, by path -- reused while the file's size and
+ *  last-modified time are unchanged. One job scan used to open the same JOB TAG, router and
+ *  measurement workbooks off the network drive two or three times (job metadata, the router's form
+ *  list, the measurements read), about 2.5 s per job; callers only read them. Kept small. */
+const workbookCache = new Map<string, { stamp: string; workbook: Promise<ExcelJS.Workbook> }>();
+const WORKBOOK_CACHE_SIZE = 16;
 
 /** Load a workbook from disk. Works for .xlsx and .xlsm (macros are ignored, we only read cells).
  * Reads via the extended-length path form -- see toLongPath's own comment -- since a real job
@@ -7,8 +15,26 @@ import { toLongPath } from "../util/longPath";
  * classic 260-character limit, and this is the single most-shared read path in the app (every
  * table/router parser goes through it). */
 export async function loadWorkbook(absolutePath: string): Promise<ExcelJS.Workbook> {
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.readFile(toLongPath(absolutePath));
+  const longPath = toLongPath(absolutePath);
+  const stat = await fs.stat(longPath).catch(() => null);
+  const stamp = stat ? `${stat.size}|${stat.mtimeMs}` : "";
+  const cached = workbookCache.get(absolutePath);
+  if (cached && stamp && cached.stamp === stamp) {
+    // Most recently used goes last, so the oldest is the one dropped.
+    workbookCache.delete(absolutePath);
+    workbookCache.set(absolutePath, cached);
+    return cached.workbook;
+  }
+  const workbook = (async () => {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.readFile(longPath);
+    return wb;
+  })();
+  if (stamp) {
+    workbookCache.set(absolutePath, { stamp, workbook });
+    workbook.catch(() => workbookCache.delete(absolutePath));
+    while (workbookCache.size > WORKBOOK_CACHE_SIZE) workbookCache.delete(workbookCache.keys().next().value!);
+  }
   return workbook;
 }
 

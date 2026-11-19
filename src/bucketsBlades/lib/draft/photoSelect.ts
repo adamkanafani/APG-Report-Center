@@ -24,6 +24,8 @@ export interface PhotoSelectResult {
 }
 
 const MAX_PHOTOS_PER_CALL = 20;
+/** AI duplicate/blur/priority screening of a job's photos -- off (see classifyBatch). */
+const AUTOMATIC_PHOTO_SCREENING = false;
 const PRIORITY_RANK: Record<PhotoPriority, number> = { high: 0, normal: 1, low: 2 };
 
 function mediaTypeFor(ext: string): "image/jpeg" | "image/png" {
@@ -46,10 +48,11 @@ function chunk<T>(items: T[], size: number): T[][] {
  * behavior), so photo preselection never depends on AI access being available. */
 async function classifyBatch(batch: JobFile[]): Promise<{ exclusions: PhotoExclusion[]; priorities: Map<string, PhotoPriority>; raw: string }> {
   const defaultPriorities = new Map<string, PhotoPriority>(batch.map((f) => [f.relativePath, "normal" as const]));
-  // No key, no screening -- checked before reading anything: each batch is 20 full-size photos off
-  // the network drive (a 800-photo job read ~260 MB just to be thrown away).
-  if (!process.env.ANTHROPIC_API_KEY?.trim()) {
-    return { exclusions: [], priorities: defaultPriorities, raw: "(skipped content-based screening: no API key)" };
+  // Off: the API key on a computer belongs to the ATS Report Reviewer (all the apps share one
+  // .env.local), and this would quietly send every job's photos to Claude on every scan. Every
+  // photo is simply included, in natural order -- what every tech's computer (no key) already does.
+  if (!AUTOMATIC_PHOTO_SCREENING || !process.env.ANTHROPIC_API_KEY?.trim()) {
+    return { exclusions: [], priorities: defaultPriorities, raw: "(content-based photo screening is off)" };
   }
   try {
     const imageBlocks = await Promise.all(

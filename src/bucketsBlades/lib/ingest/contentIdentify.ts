@@ -43,7 +43,15 @@ function mediaTypeFor(ext: string): "image/jpeg" | "image/png" | null {
  * bonus refinement on top of filename matching, never a requirement for a section to work, and
  * every match is still surfaced to the tech rep as needing confirmation (see scanJobFolder.ts),
  * never silently trusted the way a filename match is. */
+/** AI identification of an unrecognized exhibit by its content -- off (see identifyByContent). */
+const AUTOMATIC_CONTENT_IDENTIFY = false;
+
 export async function identifyByContent(sectionId: string, candidates: JobFile[]): Promise<ContentMatch[]> {
+  // Off: the API key on a computer belongs to the ATS Report Reviewer (all the apps share one
+  // .env.local), and this would send a job's PDFs to Claude automatically during a scan. The
+  // tech rep attaches the exhibit by hand when its file name isn't recognized, as on every
+  // computer without a key.
+  if (!AUTOMATIC_CONTENT_IDENTIFY) return [];
   const description = DOCUMENT_DESCRIPTIONS[sectionId];
   if (!description || candidates.length === 0) return [];
 

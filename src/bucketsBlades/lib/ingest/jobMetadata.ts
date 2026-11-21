@@ -25,29 +25,9 @@ export interface JobMetadata {
   source: "JOB TAG.xlsx" | "folder name";
 }
 
-// Field order and labels match the real "Incoming Report" cover pages (Cover + Incoming Report
-// data page) from a completed job, so the review UI and the generated PDF read the same as the
-// deliverable it's modeled on.
-export const COVER_FIELD_ORDER: Array<{ key: keyof JobMetadata; label: string }> = [
-  { key: "customer", label: "Customer" },
-  { key: "customerPO", label: "Customer PO" },
-  { key: "part", label: "Part Type" },
-  { key: "jobNumber", label: "APG Job #" },
-  { key: "date", label: "Date" },
-  { key: "techRep", label: "Tech Rep" },
-  { key: "turbineOEM", label: "Turbine OEM" },
-  { key: "turbineModel", label: "Turbine Model" },
-  { key: "component", label: "Component" },
-  { key: "castPartNumber", label: "Cast Part Number" },
-  { key: "machPartNumber", label: "Mach Part Number" },
-  { key: "quantity", label: "Quantity" },
-  { key: "material", label: "Material" },
-  { key: "coating", label: "Coating" },
-  { key: "priorRepair", label: "Prior Repair" },
-  { key: "hours", label: "Hours" },
-  { key: "starts", label: "Starts" },
-  { key: "boxes", label: "Boxes" },
-];
+// The cover field list lives in coverFields.ts: the builder page (browser code) needs it, and
+// importing it from here pulled this file's Excel/file-system code into the browser build.
+export { COVER_FIELD_ORDER } from "./coverFields";
 
 const BLANK_ENRICHMENT = {
   customerPO: "TBD",

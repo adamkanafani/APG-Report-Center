@@ -19,6 +19,9 @@ if not defined APP set "APP=%~dp0.."
 cd /d "%APP%"
 set "PATH=%PATH%;%ProgramFiles%\nodejs;%ProgramFiles%\Git\cmd;%LOCALAPPDATA%\Programs\Git\cmd"
 if not defined APG_PORT set "APG_PORT=3002"
+rem Where a version that failed to build here is remembered (outside .next, which a build wipes).
+set "SKIPFILE=%LOCALAPPDATA%\APGReportCenter\update-skip.txt"
+if not exist "%LOCALAPPDATA%\APGReportCenter" mkdir "%LOCALAPPDATA%\APGReportCenter" >nul 2>nul
 if /i "%~2"=="update" goto update
 if /i "%~2"=="rebuild" goto rebuild
 
@@ -41,6 +44,13 @@ if errorlevel 1 goto start
 set "BEHIND=0"
 for /f %%c in ('git rev-list --count HEAD..origin/main 2^>nul') do set "BEHIND=%%c"
 if "%BEHIND%"=="0" goto built
+rem A version that already failed to build on this computer (and was rolled back -- see :rollback)
+rem is skipped until a newer one is out, so a bad update costs one try, not one every launch.
+set "ORIGIN="
+for /f %%h in ('git rev-parse origin/main 2^>nul') do set "ORIGIN=%%h"
+set "SKIP="
+if exist "%SKIPFILE%" set /p SKIP=<"%SKIPFILE%"
+if defined ORIGIN if "%SKIP%"=="%ORIGIN%" goto built
 if "%APG_NO_START%"=="1" (
   call "%~f0" "%APP%" update
 ) else (
@@ -103,17 +113,20 @@ echo.
 echo A new version is available. This takes a minute or two -- the app opens
 echo on its own when it's done.
 echo.
+rem The version that's working now, to come back to if the new one doesn't build (:rollback).
+set "PREV="
+for /f %%h in ('git rev-parse HEAD 2^>nul') do set "PREV=%%h"
 rem npm can rewrite the lock file on install; drop that so the update can apply.
 git checkout -- package-lock.json >nul 2>nul
 git pull --ff-only -q origin main
 if errorlevel 1 (
   echo.
   echo The update couldn't be downloaded, so the app will open as it was.
-  echo If this keeps happening, run Install APG Report Center.cmd again.
   echo.
-  if not "%APG_NO_START%"=="1" pause
+  if not "%APG_NO_START%"=="1" timeout /t 8 >nul
   exit /b 0
 )
+set "ISUPDATE=1"
 goto build
 
 :rebuild
@@ -133,8 +146,9 @@ rem check fails on them, and a build never needs them.
 if exist ".next\dev" rmdir /s /q ".next\dev"
 call npm run build
 if errorlevel 1 (
+  if "%ISUPDATE%"=="1" if defined PREV goto rollback
   echo.
-  echo The update didn't finish building. Run Install APG Report Center.cmd to repair it,
+  echo The app didn't finish building. Run Install APG Report Center.cmd to repair it,
   echo or send a screenshot of this window to whoever set this up.
   echo.
   if not "%APG_NO_START%"=="1" pause
@@ -143,4 +157,30 @@ if errorlevel 1 (
 rem Which version this build is, for the check above.
 for /f %%h in ('git rev-parse HEAD 2^>nul') do > ".next\APG_COMMIT" echo %%h
 call scripts\make-shortcuts.cmd
+exit /b 0
+
+:rollback
+rem The new version didn't build on this computer. Go back to the version that was working and
+rem open that, rather than leave nothing to open: nobody should have to fix this before they can
+rem work. The failed version is skipped until a newer one is published (SKIPFILE).
+echo.
+echo ============================================
+echo   The new version didn't build on this computer, so the app is going back to
+echo   the version that was working. Nothing to do -- it opens in a minute or two.
+echo ============================================
+echo.
+for /f %%h in ('git rev-parse HEAD 2^>nul') do > "%SKIPFILE%" echo %%h
+git reset -q --hard %PREV%
+call npm install --no-fund --no-audit
+if exist ".next\dev" rmdir /s /q ".next\dev"
+call npm run build
+if errorlevel 1 (
+  echo.
+  echo The app couldn't be rebuilt. Run Install APG Report Center.cmd to repair it,
+  echo or send a screenshot of this window to whoever set this up.
+  echo.
+  if not "%APG_NO_START%"=="1" pause
+  exit /b 1
+)
+for /f %%h in ('git rev-parse HEAD 2^>nul') do > ".next\APG_COMMIT" echo %%h
 exit /b 0

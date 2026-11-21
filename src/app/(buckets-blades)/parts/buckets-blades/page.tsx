@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePartName } from "@/lib/usePartName";
 import type { JobScanResult, SectionScanResult } from "@/bucketsBlades/lib/ingest/scanJobFolder";
 import type { JobFile } from "@/bucketsBlades/lib/ingest/fileWalk";
-import { COVER_FIELD_ORDER } from "@/bucketsBlades/lib/ingest/jobMetadata";
+import { COVER_FIELD_ORDER } from "@/bucketsBlades/lib/ingest/coverFields";
 import type { SectionState } from "@/bucketsBlades/lib/state/jobState";
 
 type SectionWithState = SectionScanResult & { state: SectionState };

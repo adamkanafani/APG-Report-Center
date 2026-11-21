@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { JobScanResult, SectionScanResult } from "@/lib/ingest/scanJobFolder";
 import type { JobFile } from "@/lib/ingest/fileWalk";
-import { COVER_FIELD_ORDER } from "@/lib/ingest/jobMetadata";
+import { COVER_FIELD_ORDER } from "@/lib/ingest/coverFields";
 import type { SectionState } from "@/lib/state/jobState";
 import { effectiveMultiSelection, isExcluded } from "@/lib/state/selection";
 import { PhotoPagePicker } from "./PhotoPagePicker";

@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import sharp from "sharp";
+import { cropPixels, validCrop } from "../../../lib/photoCrop";
 import type { JobScanResult, SectionScanResult } from "../ingest/scanJobFolder";
 import { COVER_FIELD_ORDER } from "../ingest/jobMetadata";
 import { applySectionOrder, type JobState, type SectionState } from "../state/jobState";
@@ -152,8 +153,19 @@ function renderNarrative(text: string | undefined): string {
  * renderer outright (a real failure hit while testing photo selection: ~90MB of source JPEGs
  * blew up the CDP connection puppeteer uses to load the page). 1200px on the long edge is more
  * than enough detail for a report exhibit. */
-async function photoToDataUri(absolutePath: string): Promise<string> {
-  const buffer = await sharp(absolutePath).rotate().resize({ width: 1200, height: 1200, fit: "inside", withoutEnlargement: true }).jpeg({ quality: 72 }).toBuffer();
+async function photoToDataUri(absolutePath: string, crop?: unknown): Promise<string> {
+  let image = sharp(absolutePath).rotate();
+  // The tech rep's crop (see lib/photoCrop.ts): cut from the upright photo, then sized as usual --
+  // its shape already matches the photo's spot on the page.
+  const c = validCrop(crop);
+  if (c) {
+    const meta = await sharp(absolutePath).metadata();
+    const sideways = (meta.orientation ?? 1) >= 5;
+    const width = (sideways ? meta.height : meta.width) ?? 0;
+    const height = (sideways ? meta.width : meta.height) ?? 0;
+    if (width && height) image = image.extract(cropPixels(c, width, height));
+  }
+  const buffer = await image.resize({ width: 1200, height: 1200, fit: "inside", withoutEnlargement: true }).jpeg({ quality: 72 }).toBuffer();
   return `data:image/jpeg;base64,${buffer.toString("base64")}`;
 }
 
@@ -201,7 +213,7 @@ async function renderPhotoSet(section: SectionScanResult, jobRoot: string, secti
   const images = await Promise.all(
     paths.map(async (relativePath) => {
       try {
-        const dataUri = await photoToDataUri(path.join(jobRoot, relativePath));
+        const dataUri = await photoToDataUri(path.join(jobRoot, relativePath), sectionState?.photoCrops?.[relativePath]);
         return `<figure><img src="${dataUri}" /></figure>`;
       } catch {
         return "";

@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import type { JobFile } from "@/lib/ingest/fileWalk";
 import type { SectionState } from "@/lib/state/jobState";
+import { PhotoCropDialog } from "@/components/PhotoCropDialog";
+import { cropViewBox, validCrop, VN_SLOT_ASPECT, type PhotoCrop } from "@/lib/photoCrop";
 import { groupPhotos, labelRank, layoutGroup, photoGroupOf, photoPick, photoSlots, PHOTOS_PER_REPORT_PAGE } from "@/lib/pdf/photoGroups";
 
 // Group titles a photo can always be moved into, besides whatever the job's own folders produce.
@@ -66,6 +68,26 @@ export function PhotoPagePicker({
   const [hideUsed, setHideUsed] = useState(false);
   const [focus, setFocus] = useState<string | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
+  // Crops / zooms, by photo (see lib/photoCrop.ts), and the photo whose crop window is open.
+  const [crops, setCrops] = useState<Record<string, PhotoCrop>>(() => ({ ...section.state.photoCrops }));
+  const [cropping, setCropping] = useState<string | null>(null);
+  const saveCrop = (p: string, crop: PhotoCrop | null) => {
+    const next = { ...crops };
+    if (crop) next[p] = crop;
+    else delete next[p];
+    setCrops(next);
+    setCropping(null);
+    fetch("/api/vn/section-state", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jobRoot, sectionId: section.id, patch: { photoCrops: next } }),
+    });
+  };
+  /** A thumbnail shows the crop the way the report prints it. */
+  const cropStyle = (p: string): CSSProperties | undefined => {
+    const c = validCrop(crops[p]);
+    return c ? ({ objectViewBox: cropViewBox(c) } as CSSProperties) : undefined;
+  };
 
   const placedCount = Object.values(layout).reduce((n, slots) => n + slots.filter(Boolean).length, 0);
   const slotOf = (p: string) => {
@@ -212,6 +234,9 @@ export function PhotoPagePicker({
               <button type="button" className="secondary" onClick={() => step(1)} disabled={tabPhotos.indexOf(current) >= tabPhotos.length - 1}>
                 →
               </button>
+              <button type="button" className="secondary" onClick={() => setCropping(current)} title="Crop or zoom this photo for the report">
+                {crops[current] ? "Edit crop" : "Crop / zoom"}
+              </button>
               <button type="button" className={isPlaced(current) ? "secondary" : ""} onClick={() => toggle(current)}>
                 {isPlaced(current) ? "Remove from report" : "Add to report"}
               </button>
@@ -351,7 +376,8 @@ export function PhotoPagePicker({
                           <span className="photo-slot-number">{k + 1}</span>
                           {p ? (
                             <>
-                              <img src={url(p, 360)} alt={p} draggable={false} />
+                              <img src={url(p, 360)} alt={p} draggable={false} style={cropStyle(p)} />
+                              {crops[p] && <span className="photo-slot-cropped" title="Cropped / zoomed">Cropped</span>}
                               <button
                                 type="button"
                                 className="photo-slot-remove"
@@ -377,6 +403,16 @@ export function PhotoPagePicker({
           );
         })}
       </div>
+      {cropping && (
+        <PhotoCropDialog
+          src={url(cropping, 1600)}
+          title={name(cropping) ?? cropping}
+          aspect={VN_SLOT_ASPECT}
+          crop={validCrop(crops[cropping])}
+          onSave={(c) => saveCrop(cropping, c)}
+          onClose={() => setCropping(null)}
+        />
+      )}
     </div>
   );
 }

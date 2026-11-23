@@ -6,6 +6,10 @@ import os from "os";
 export interface SectionState {
   /** Current draft/content text (narrative sections), or a JSON-serialized table edit, etc. */
   content?: string;
+  /** The tech rep's crop / zoom of photos, by relative path -- the part of each photo to print,
+   * shaped like its spot on the page (see lib/photoCrop.ts). A photo without one prints with the
+   * normal automatic fit. */
+  photoCrops?: Record<string, import("../../../lib/photoCrop").PhotoCrop>;
   /** For photo-select sections: the reviewer-confirmed selection. */
   selectedPhotoPaths?: string[];
   /** For the I&A Summary narrative section only: whether to embed APG's standard 7FA

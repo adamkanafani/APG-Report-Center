@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { PhotoCropDialog } from "@/components/PhotoCropDialog";
+import { cropViewBox, validCrop, type PhotoCrop } from "@/lib/photoCrop";
 import { usePartName } from "@/lib/usePartName";
 import type { JobScanResult, SectionScanResult } from "@/bucketsBlades/lib/ingest/scanJobFolder";
 import type { JobFile } from "@/bucketsBlades/lib/ingest/fileWalk";
@@ -844,6 +846,23 @@ function PhotoSetEditor({ jobRoot, section }: { jobRoot: string; section: Sectio
   const [filter, setFilter] = useState<"all" | "selected">("all");
   const [page, setPage] = useState(0);
   const [showAll, setShowAll] = useState(false);
+  // Crops / zooms, by photo (see lib/photoCrop.ts): a crop keeps the photo's own shape, so it
+  // prints the same size as the uncropped photos next to it.
+  const [crops, setCrops] = useState<Record<string, PhotoCrop>>(() => ({ ...section.state.photoCrops }));
+  const [cropping, setCropping] = useState<string | null>(null);
+  const photoUrl = (relativePath: string) => `/api/bb/photo-file?jobRoot=${encodeURIComponent(jobRoot)}&path=${encodeURIComponent(relativePath)}`;
+  const saveCrop = (relativePath: string, crop: PhotoCrop | null) => {
+    const next = { ...crops };
+    if (crop) next[relativePath] = crop;
+    else delete next[relativePath];
+    setCrops(next);
+    setCropping(null);
+    fetch("/api/bb/section-state", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jobRoot, sectionId: section.id, patch: { photoCrops: next } }),
+    });
+  };
 
   const toggle = async (relativePath: string) => {
     const next = selected.includes(relativePath) ? selected.filter((p) => p !== relativePath) : [...selected, relativePath];
@@ -900,10 +919,24 @@ function PhotoSetEditor({ jobRoot, section }: { jobRoot: string; section: Sectio
           {shown.map((f) => (
             <div key={f.relativePath} className={`photo-tile ${selected.includes(f.relativePath) ? "selected" : ""}`} onClick={() => toggle(f.relativePath)}>
               <img
-                src={`/api/bb/photo-file?jobRoot=${encodeURIComponent(jobRoot)}&path=${encodeURIComponent(f.relativePath)}`}
+                src={photoUrl(f.relativePath)}
                 alt={f.relativePath}
                 loading="lazy"
+                style={validCrop(crops[f.relativePath]) ? ({ objectViewBox: cropViewBox(validCrop(crops[f.relativePath])!) } as CSSProperties) : undefined}
               />
+              {selected.includes(f.relativePath) && (
+                <button
+                  type="button"
+                  className="photo-tile-crop"
+                  title="Crop or zoom this photo for the report"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCropping(f.relativePath);
+                  }}
+                >
+                  {crops[f.relativePath] ? "Cropped ✎" : "Crop"}
+                </button>
+              )}
               <div className="caption">{f.relativePath.split("/").pop()}</div>
             </div>
           ))}
@@ -940,6 +973,16 @@ function PhotoSetEditor({ jobRoot, section }: { jobRoot: string; section: Sectio
             </button>
           </div>
         ))}
+      {cropping && (
+        <PhotoCropDialog
+          src={photoUrl(cropping)}
+          title={cropping.split("/").pop() ?? cropping}
+          aspect="photo"
+          crop={validCrop(crops[cropping])}
+          onSave={(c) => saveCrop(cropping, c)}
+          onClose={() => setCropping(null)}
+        />
+      )}
     </div>
   );
 }

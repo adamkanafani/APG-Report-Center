@@ -1601,3 +1601,20 @@ button.generate-report:active:not(:disabled) {
   color: #6a7683;
   margin-bottom: 4px;
 }
+
+/* "Crop" button on a selected photo tile (opens the crop / zoom window). */
+button.photo-tile-crop {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(11, 61, 145, 0.88);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+button.photo-tile-crop:hover {
+  background: #0b3d91;
+}

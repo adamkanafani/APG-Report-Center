@@ -11,6 +11,10 @@ export interface SectionState {
   /** The Fleet Service (FS) version's text for a section that's shorter there -- Calpine's FS
    * Repair Recommendations / Repair Summary (Job 20992). Blank means the FS version prints `content`. */
   compactContent?: string;
+  /** The tech rep's crop / zoom of photos, by relative path -- the part of each photo to print,
+   * shaped like its spot on the page (see lib/photoCrop.ts). A photo without one prints with the
+   * normal automatic fit. */
+  photoCrops?: Record<string, import("../photoCrop").PhotoCrop>;
   /** For photo-select sections: the reviewer-confirmed selection. */
   selectedPhotoPaths?: string[];
   /** The same pick per report ("ia" / "final") once the tech rep changes it for that report -- see

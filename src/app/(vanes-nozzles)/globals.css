@@ -2113,7 +2113,8 @@ button.add-section-btn:hover:not(:disabled) {
 
 .photo-slot {
   position: relative;
-  aspect-ratio: 4 / 3;
+  /* The report's own photo slot shape (246 x 206 pt), so a thumbnail -- and a crop -- looks as it prints. */
+  aspect-ratio: 246 / 206;
   border: 2px dashed #c9d8ee;
   border-radius: 6px;
   background: #f7faff;
@@ -2340,4 +2341,17 @@ button.rt-button:hover:not(:disabled) {
 
 .home-link:hover {
   text-decoration: underline;
+}
+
+/* "Cropped" tag on a page-slot thumbnail the tech rep cropped / zoomed. */
+.photo-slot-cropped {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(11, 61, 145, 0.85);
+  color: #fff;
+  font-size: 11px;
+  pointer-events: none;
 }
